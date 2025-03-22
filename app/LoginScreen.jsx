@@ -9,32 +9,77 @@ import { Ionicons } from '@expo/vector-icons';
 const LoginScreen = () => {
   const router = useRouter();
   const scaleValue = new Animated.Value(1);
-
-  // ✅ Automatically logs in without input
+  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  
   const handleLogin = async () => {
-    await AsyncStorage.setItem("userToken", "loggedIn");
-    router.replace("/tabs/home");
+    if (!email) {
+      Alert.alert("Error", "Please enter email or username");
+      return;
+    }
+    if (!password) {
+      Alert.alert("Error", "Please enter your password");
+      return;
+    }
+  
+    try {
+      const response = await fetch("http://192.168.1.206:5000/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ emailOrUsername: email, password }),
+      });
+  
+      const data = await response.json();
+  
+      if (response.ok) {
+        await AsyncStorage.setItem("userData", JSON.stringify(data.user));
+        router.replace("/tabs/home");
+      } else {
+        Alert.alert("Login Failed", data.message || "Invalid credentials");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Network error. Please try again.");
+    }
   };
+  
+  
 
   const handleBack = () => {
-    // ✅ This will now properly navigate back to index.tsx
     router.replace('/');
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
-
-      {/* ✅ Removed email & password input for quick testing */}
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity style={styles.registerButton} onPress={() => router.push("/register")}>
+      
+      <TouchableOpacity style={styles.registerButton} onPress={() => router.push("/register")}> 
         <Text style={styles.registerButtonText}>Create an Account</Text>
       </TouchableOpacity>
-
-      {/* Back Button */}
+      
       <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={20} color="#008000" />
@@ -58,6 +103,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     color: "#333",
+  },
+  input: {
+    width: "100%",
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
   },
   button: {
     width: "100%",
