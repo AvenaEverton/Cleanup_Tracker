@@ -25,17 +25,47 @@ const RegisterScreen = () => {
   };
 
   const handleRegister = async () => {
+    if (!fullName || !userName || !email || !password || !confirmPassword) {
+      Alert.alert("Error", "All fields are required!");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match!");
+      return;
+    }
+  
     await playSound();
-    console.log({
-      fullName,
-      userName,
-      email,
-      password,
-      confirmPassword,
-      userType,
-      idPhoto
-    });
+  
+    try {
+      const response = await fetch("http://192.168.1.206:5000/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName,
+          username: userName,   // Make sure it matches the backend field
+          email,
+          password,
+          userType,
+          idImagePath: idPhoto, // Store the ID image path in the database
+        }),
+      });
+  
+      const data = await response.json();
+  
+      if (response.ok) {
+        Alert.alert("Success", data.message);
+        navigation.navigate("LoginScreen");
+      } else {
+        Alert.alert("Registration Failed", data.message);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Something went wrong. Try again.");
+    }
   };
+  
+    
 
   const handleBack = async () => {
     await playSound();
