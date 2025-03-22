@@ -57,6 +57,28 @@ app.post("/api/login", (req, res) => {
       });
     });
   });
+
+
+  app.post("/api/register", async (req, res) => {
+    const { fullName, username, email, password, userType, idImagePath } = req.body;
+  
+    if (!fullName || !username || !email || !password) {
+      return res.status(400).json({ message: "All fields are required!" });
+    }
+  
+    const hashedPassword = await bcrypt.hash(password, 10);
+  
+    const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) 
+                   VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
+  
+    db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Database error!" });
+      }
+      res.status(201).json({ message: "Registration successful!" });
+    });
+  });
   
 
 // ✅ Start Server
