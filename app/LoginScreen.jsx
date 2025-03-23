@@ -36,7 +36,13 @@ const LoginScreen = () => {
   
       if (response.ok) {
         await AsyncStorage.setItem("userData", JSON.stringify(data.user));
-        router.replace("/tabs/home");
+  
+        // Check user role
+        if (data.user.role === "admin") {
+          router.replace("/AdminTabs/Admin_home"); // Navigate to Admin interface
+        } else {
+          router.replace("/tabs/home"); // Navigate to User interface
+        }
       } else {
         Alert.alert("Login Failed", data.message || "Invalid credentials");
       }
@@ -44,7 +50,7 @@ const LoginScreen = () => {
       Alert.alert("Error", "Network error. Please try again.");
     }
   };
-  
+    
   
 
   const handleBack = () => {

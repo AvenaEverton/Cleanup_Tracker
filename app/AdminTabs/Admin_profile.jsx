@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../../context/ThemeContext"; // Ensure correct path
 
-const ProfileScreen = () => {
+const AdminProfile = () => {
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useContext(ThemeContext);
 
@@ -93,4 +93,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen;
+export default AdminProfile;
