@@ -1,10 +1,12 @@
-import { useState } from "react";
+// LoginScreen.jsx
+import React, { useState } from "react";
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated 
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from '@expo/vector-icons';
+import axios from "axios";
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -22,37 +24,39 @@ const LoginScreen = () => {
       Alert.alert("Error", "Please enter your password");
       return;
     }
-  
+
     try {
-      const response = await fetch("http://192.168.1.206:5000/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ emailOrUsername: email, password }),
+      const response = await axios.post("http://192.168.1.206:5000/api/login", {
+        emailOrUsername: email,
+        password,
       });
-  
-      const data = await response.json();
-  
-      if (response.ok) {
-        await AsyncStorage.setItem("userData", JSON.stringify(data.user));
-  
-        // Check user role
-        if (data.user.role === "admin") {
-          router.replace("/AdminTabs/Admin_home"); // Navigate to Admin interface
+
+      if (response.data.success) {
+        const user = response.data.user; // Get the user object
+
+        if (user.status === "pending") {
+          Alert.alert("Account Pending", "Your account is still under review by the administrator. Please wait for approval.");
+          return; // Stop the login process
+        }
+
+        const userId = String(user.user_id);
+        await AsyncStorage.setItem("userId", userId);
+        console.log("Login successful, userId saved:", userId);
+
+        if (user.role === "admin") {
+          router.replace("/AdminTabs/Admin_home");
         } else {
-          router.replace("/tabs/home"); // Navigate to User interface
+          router.replace("/tabs/home");
         }
       } else {
-        Alert.alert("Login Failed", data.message || "Invalid credentials");
+        Alert.alert("Login Failed", response.data.message || "Invalid credentials");
       }
     } catch (error) {
+      console.error("Login error:", error);
       Alert.alert("Error", "Network error. Please try again.");
     }
   };
     
-  
-
   const handleBack = () => {
     router.replace('/');
   };
@@ -63,7 +67,7 @@ const LoginScreen = () => {
       
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email or Username"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
