@@ -5,7 +5,6 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Import AsyncStorage
 
 const RegisterScreen = () => {
   const navigation = useNavigation();
@@ -34,9 +33,9 @@ const RegisterScreen = () => {
       Alert.alert("Error", "Passwords do not match!");
       return;
     }
-
+  
     await playSound();
-
+  
     try {
       const response = await fetch("http://192.168.1.206:5000/api/register", {
         method: "POST",
@@ -45,22 +44,18 @@ const RegisterScreen = () => {
         },
         body: JSON.stringify({
           fullName,
-          username: userName,
+          username: userName,   // Make sure it matches the backend field
           email,
           password,
           userType,
-          idImagePath: idPhoto,
+          idImagePath: idPhoto, // Store the ID image path in the database
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (response.ok) {
         Alert.alert("Success", data.message);
-        //  Store the user ID upon successful registration.
-        const userId = data.userId; // Assuming your backend returns the new user's ID in the response
-        await AsyncStorage.setItem('userId', String(userId)); //important
-        console.log('User registered successfully.  userId stored:', userId)
         navigation.navigate("LoginScreen");
       } else {
         Alert.alert("Registration Failed", data.message);
@@ -69,7 +64,8 @@ const RegisterScreen = () => {
       Alert.alert("Error", "Something went wrong. Try again.");
     }
   };
-
+  
+    
 
   const handleBack = async () => {
     await playSound();
@@ -100,7 +96,6 @@ const RegisterScreen = () => {
       setIsAuthorized(false);
       setUserType("Local User");
       setIdPhoto(null);
-      setIdPhoto(null);
     }
   };
 
@@ -119,7 +114,7 @@ const RegisterScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Register Here</Text>
-      
+     
       <TextInput
         style={styles.input}
         placeholder="Full Name"

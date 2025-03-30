@@ -49,8 +49,8 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const { user_id, role, status } = user[0]; // Include the status field
-    res.json({ success: true, user: { user_id, role, status } }); // Send the status in the response
+    const { user_id, role, status } = user[0];
+    res.json({ success: true, user: { user_id, role, status } });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -61,33 +61,21 @@ app.post("/api/register", async (req, res) => {
   const { fullName, username, email, password, userType, idImagePath } = req.body;
 
   if (!fullName || !username || !email || !password) {
-    return res.status(400).json({ error: "All fields are required" });
+    return res.status(400).json({ message: "All fields are required!" });
   }
 
-  const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ error: "Invalid email format" });
-  }
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters long" });
-  }
+  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
 
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userSql = "INSERT INTO users (full_name, username, email, password, role, id_image_path, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')"; //added status pending.
-    const [result] = await db.promise().query(userSql, [fullName, username, email, hashedPassword, userType, idImagePath]);
-
-    const userId = result.insertId;
-
-    res.json({ message: "User registered successfully", userId });
-  } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ error: "Email or username already exists" });
+  db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Database error!" });
     }
-    console.error("Registration error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
+    res.status(201).json({ message: "Registration successful!" });
+  });
 });
 
 app.get("/api/admin/dashboard", (req, res) => {
@@ -226,6 +214,56 @@ app.get("/events", (req, res) => {
     if (err) return res.status(500).json({ error: "Database error" });
     res.json(results);
   });
+});
+
+app.get('/api/admin/users', async (req, res) => {
+  const filter = req.query.filter;
+  let sql = 'SELECT user_id, username, status FROM users';
+
+  if (filter && filter !== 'All') {
+    sql += ` WHERE status = "${filter}"`;
+  }
+
+  console.log('API Request received with filter:', filter);
+  console.log('SQL Query:', sql);
+
+  try {
+    const [users] = await db.promise().query(sql);
+    console.log('SQL Query Result (users):', users);
+
+    const countQueries = {
+      approved: `SELECT COUNT(*) as count FROM users WHERE status = "Approved" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+      pending: `SELECT COUNT(*) as count FROM users WHERE status = "Pending" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+      restricted: `SELECT COUNT(*) as count FROM users WHERE status = "Restricted" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+    };
+
+    const countResults = await Promise.all(
+      Object.values(countQueries).map((query) => db.promise().query(query))
+    );
+
+    const approvedCount = countResults[0][0][0].count;
+    const pendingCount = countResults[1][0][0].count;
+    const restrictedCount = countResults[2][0][0].count;
+
+    res.json({
+      users,
+      approvedCount,
+      pendingCount,
+      restrictedCount,
+      totalUsers: users.length,
+    });
+
+    console.log('API Response sent:', {
+      users,
+      approvedCount,
+      pendingCount,
+      restrictedCount,
+      totalUsers: users.length,
+    });
+  } catch (err) {
+    console.error('Error fetching users or counts:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 const PORT = 5000;

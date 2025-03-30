@@ -1,25 +1,65 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Assuming you're using Expo Icons
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 
 const AdminUsers = () => {
-  // Dummy data for users (replace with your actual data fetching)
-  const users = [
-    { id: 1, username: 'User1', status: 'Approved' },
-    { id: 2, username: 'User2', status: 'Pending' },
-    { id: 3, username: 'User3', status: 'Restricted' },
-    { id: 4, username: 'User4', status: 'Approved' },
-    { id: 5, username: 'User5', status: 'Pending' },
-    { id: 6, username: 'User6', status: 'Restricted' },
-    { id: 7, username: 'User7', status: 'Approved' },
-    { id: 8, username: 'User8', status: 'Pending' },
-  ];
+  const [users, setUsers] = useState([]);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [restrictedCount, setRestrictedCount] = useState(0);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState('All');
 
-  // Dummy data for counts (replace with your actual data fetching)
-  const approvedCount = 100;
-  const pendingCount = 100;
-  const restrictedCount = 100;
-  const totalUsers = 300; // Calculated from the above counts
+  useEffect(() => {
+    const fetchUsersData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        console.log('Fetching users with filter:', filter);
+        const response = await axios.get(`http://192.168.1.206:5000/api/admin/users?filter=${filter}`);
+        console.log('API Response:', response.data);
+
+        if (response.data) {
+          setUsers(response.data.users);
+          setApprovedCount(response.data.approvedCount);
+          setPendingCount(response.data.pendingCount);
+          setRestrictedCount(response.data.restrictedCount);
+          setTotalUsers(response.data.totalUsers);
+        } else {
+          setError('Failed to fetch user data');
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err.response); // Added err.response
+        setError('Failed to fetch user data');
+        Alert.alert('Error', 'Failed to fetch user data. Please try again.');
+      } finally {
+        setLoading(false);
+        console.log('Loading state set to false');
+      }
+    };
+
+    fetchUsersData();
+  }, [filter]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading users...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -33,13 +73,22 @@ const AdminUsers = () => {
       <View style={styles.controlCenter}>
         <Text style={styles.controlCenterTitle}>User Control Center</Text>
         <View style={styles.filterBar}>
-          <Text style={styles.filterText}>Filter: All</Text>
+          <Picker
+            selectedValue={filter}
+            style={{ height: 50, width: 150 }}
+            onValueChange={(itemValue) => setFilter(itemValue)}
+          >
+            <Picker.Item label="All" value="All" />
+            <Picker.Item label="Approved" value="Approved" />
+            <Picker.Item label="Pending" value="Pending" />
+            <Picker.Item label="Restricted" value="Restricted" />
+          </Picker>
           <Text style={styles.sortText}>Sort by: Date</Text>
         </View>
 
         <ScrollView style={styles.userList}>
           {users.map((user) => (
-            <View key={user.id} style={styles.userItem}>
+            <View key={user.user_id} style={styles.userItem}>
               <View style={styles.userIcon}>
                 <Ionicons name="people-outline" size={24} color="black" />
               </View>
@@ -65,7 +114,7 @@ const AdminUsers = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0', // Light background
+    backgroundColor: '#f0f0f0',
     padding: 20,
   },
   header: {
@@ -95,6 +144,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
+    alignItems: 'center',
   },
   filterText: {
     fontSize: 14,
@@ -103,7 +153,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   userList: {
-    maxHeight: 300, // Adjust as needed
+    maxHeight: 300,
   },
   userItem: {
     flexDirection: 'row',
@@ -135,6 +185,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'red',
   },
 });
 

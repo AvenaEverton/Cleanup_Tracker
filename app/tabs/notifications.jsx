@@ -1,4 +1,3 @@
-// Notifications.jsx (React Native)
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -29,7 +28,7 @@ const NotificationsScreen = () => {
           }
           const data = await response.json();
           console.log("API Response Data:", data);
-          setNotifications(data);
+          setNotifications(data.notifications); // Extract the notifications array
         } else {
           setError("userId not found in AsyncStorage");
           console.error("userId not found in AsyncStorage");
