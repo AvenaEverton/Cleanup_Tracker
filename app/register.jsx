@@ -37,7 +37,7 @@ const RegisterScreen = () => {
     await playSound();
   
     try {
-      const response = await fetch("http://192.168.1.206:5000/api/register", {
+      const response = await fetch("http://192.168.1.194:5000/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
