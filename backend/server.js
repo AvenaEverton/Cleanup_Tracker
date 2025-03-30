@@ -82,4 +82,4 @@ app.post("/api/login", (req, res) => {
   
 
 // ✅ Start Server
-app.listen(5000, () => console.log("🚀 Backend running at http://192.168.1.206:5000"));
+app.listen(5000, () => console.log("🚀 Backend running at http://192.168.1.192:5000"));

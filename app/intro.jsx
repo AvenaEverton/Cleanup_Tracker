@@ -36,23 +36,8 @@ export default function IntroScreen({ navigation }) {
       }).start();
     });
 
-    Animated.timing(slideAnim, {
-      toValue: -300,
-      duration: 800,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start(() => {
-      slideAnim.setValue(300);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-    });
-
     Animated.timing(progressAnim, {
-      toValue: (slideIndex * 33.33),
+      toValue: slideIndex * 33.33,
       duration: 800,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
@@ -98,80 +83,63 @@ export default function IntroScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Background image with fade effect */}
       <Animated.Image
         source={getImageSource()}
         style={[styles.fullScreenImage, { opacity: bgFadeAnim }]}
       />
 
       <View style={styles.overlayContainer}>
-        <Animated.View
-          style={[styles.contentContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}
-        >
+        <Animated.View style={[styles.contentContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>          
+          {/* Progress Bar at the Top */}
+          <View style={styles.progressWrapper}>
+            <Text style={styles.progressText}>{slideIndex}/3</Text>
+            <View style={styles.progressBarContainer}>
+              <Animated.View style={[styles.progressBar, {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 100],
+                  outputRange: ['0%', '100%']
+                }),
+              }]} />
+            </View>
+          </View>
+
+          <Text style={styles.title}>
+            {slideIndex === 1 ? 'Description:' : slideIndex === 2 ? 'App Features:' : 'Our Mission:'}
+          </Text>
+          
           {slideIndex === 1 && (
             <>
-              <Text style={styles.title}>Description:</Text>
-              <Text style={styles.description}>
-                One of the major problems in {'\n'}
+              <Text style={styles.description}>One of the major problems in {'\n'}
                 <Text style={styles.boldText}>Bucana, Nasugbu, Batangas</Text> is improper waste management.{"\n\n"}
                 This app was developed to provide a platform where residents can:{"\n\n"}
               </Text>
-
-              <TouchableOpacity style={styles.button} onPress={handleNext}>
-                <Text style={styles.buttonText}>Continue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Text style={styles.buttonText}>Back</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={handleNext}><Text style={styles.buttonText}>Continue</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}><Text style={styles.buttonText}>Back</Text></TouchableOpacity>
             </>
           )}
 
           {slideIndex === 2 && (
             <>
-              <Text style={styles.title}>App Features:</Text>
               <Text style={styles.description}>
               ✅ <Text style={styles.highlightText}>Report environmental issues</Text>{"\n"}
               ✅ <Text style={styles.highlightText}>Become an Environmental Advocate</Text>{"\n"}
               ✅ <Text style={styles.highlightText}>Access guidelines for proper waste disposal</Text>{"\n\n"}
-
               </Text>
-
-              <TouchableOpacity style={styles.button} onPress={handleNext}>
-                <Text style={styles.buttonText}>Continue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Text style={styles.buttonText}>Back</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={handleNext}><Text style={styles.buttonText}>Continue</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}><Text style={styles.buttonText}>Back</Text></TouchableOpacity>
             </>
           )}
 
           {slideIndex === 3 && (
             <>
-              <Text style={styles.title}>Our Mission:</Text>
-              <Text style={styles.description}>
-                Our goal is to promote a {"\n"}
+              <Text style={styles.description}>Our goal is to promote a {"\n"}
                 <Text style={styles.boldText}>cleaner and more sustainable community.</Text>
               </Text>
-
-              <TouchableOpacity style={styles.button} onPress={handleProceed}>
-                <Text style={styles.buttonText}>Proceed</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Text style={styles.buttonText}>Back</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={handleProceed}><Text style={styles.buttonText}>Proceed</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}><Text style={styles.buttonText}>Back</Text></TouchableOpacity>
             </>
           )}
         </Animated.View>
-
-        {/* Progress Bar (stays at bottom) */}
-        <View style={styles.progressBarContainer}>
-          <Animated.View style={[styles.progressBar, {
-            width: progressAnim.interpolate({
-              inputRange: [0, 100],
-              outputRange: ['0%', '100%']
-            }),
-          }]} />
-        </View>
       </View>
     </View>
   );
@@ -179,7 +147,6 @@ export default function IntroScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
   },
   fullScreenImage: {
     position: 'absolute',
@@ -189,7 +156,7 @@ const styles = StyleSheet.create({
   },
   overlayContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end', // ✅ Keeps content at the bottom
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   contentContainer: {
@@ -206,37 +173,26 @@ const styles = StyleSheet.create({
     backdropFilter: 'blur(15px)', // ✅ Glassmorphism blur effect
     elevation: 5,
   },
+  progressText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff', // ✅ White color for progress text
+    textAlign: 'center',
+    marginBottom: 10,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#fff', // ✅ Text visible on glass effect
+    color: '#fff',
+    textAlign: 'center',
   },
   description: {
     fontSize: 16,
-    color: '#f0f0f0', // ✅ Slightly brighter text for visibility
-  },
-  button: {
-    backgroundColor: '#008000',
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  backButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
+    color: '#f0f0f0',
     textAlign: 'center',
   },
   progressBarContainer: {
+    width: '100%',
     height: 8,
     backgroundColor: '#ccc',
     borderRadius: 10,
@@ -247,5 +203,27 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#008000',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginTop: 20,
+  },
+  button: {
+    backgroundColor: '#008000',
+    paddingVertical: 14,
+    paddingHorizontal: 50,
+    borderRadius: 10,
+  },
+  backButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 14,
+    paddingHorizontal: 50,
+    borderRadius: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 18,
+    textAlign: 'center',
+  },
 });
-

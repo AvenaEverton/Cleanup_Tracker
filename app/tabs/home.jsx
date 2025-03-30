@@ -1,12 +1,16 @@
 import React, { useContext, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from "react-native";
+import { 
+  View, Text, TextInput, TouchableOpacity, Image, Animated, 
+  Easing, StyleSheet 
+} from "react-native";
 import { ThemeContext } from "../../context/ThemeContext";
-import { Ionicons } from '@expo/vector-icons';
-import { Animated, Easing  } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router"; 
 
 export default function HomeScreen() {
   const { darkMode } = useContext(ThemeContext);
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const router = useRouter();
 
   useEffect(() => {
     Animated.loop(
@@ -22,72 +26,42 @@ export default function HomeScreen() {
           duration: 2000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
-        })
+        }),
       ])
     ).start();
   }, []);
-  
-  const rotate = waveAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-15deg', '15deg'] // ✅ Natural human wave na super soft
-  });
-  
+
   return (
     <View style={[styles.container, darkMode ? styles.darkBackground : styles.lightBackground]}>
-
+      
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Search..."
-          placeholderTextColor="#999"
-        />
+        <TextInput style={styles.searchInput} placeholder="Search..." placeholderTextColor="#999" />
         <Ionicons name="search" size={20} color="#666" />
       </View>
 
-{/* Header Background */}
-<View style={styles.headerBackground}>
-  <View style={styles.overlayContent}>
-    <View style={styles.greetingContainer}>
-    <Text 
-  style={[
-    styles.greetingText, 
-    darkMode ? styles.darkText : styles.lightText, 
-    { transform: [{ translateY: 30 }] } // ✅ Shifted down by 10 pixels
-  ]}
->
-  Hello!
-</Text>
-
-<Animated.Text
-  style={{
-    fontSize: 32,
-    marginLeft: 50, // ✅ Still nasa kanan
-    marginTop: -15, // ✅ Slightly tinaas ng onti lang
-    transform: [
-      { rotate: waveAnim.interpolate({
-          inputRange: [-1, 1],
-          outputRange: ['-30deg', '30deg']
-        })
-      }
-    ]
-  }}
->
-  👋
-</Animated.Text>
-
-
-      <Text style={[styles.usernameText, darkMode ? styles.darkText : styles.lightText]}>
-        "Username"
-      </Text>
-    </View>
-    <TouchableOpacity style={styles.profileIcon}>
-      <Ionicons name="person-circle" size={70} color="#F7F7F7" />
-    </TouchableOpacity>
-  </View>
-</View>
-
-
+      {/* Header Background */}
+      <View style={styles.headerBackground}>
+        <View style={styles.overlayContent}>
+          <View style={styles.greetingContainer}>
+            <Text style={[styles.greetingText, darkMode ? styles.darkText : styles.lightText]}>
+              Hello!
+            </Text>
+            <Animated.Text style={{ fontSize: 32, marginLeft: 50, marginTop: -40 }}>
+              👋  
+            </Animated.Text>
+            <Text style={[styles.usernameText, darkMode ? styles.darkText : styles.lightText]}>
+              Username
+            </Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => router.push("/tabs/profile")} 
+            style={{ marginTop: -30 }} 
+          > 
+            <Ionicons name="person-circle" size={70} color="#F7F7F7" />
+          </TouchableOpacity>
+        </View> 
+      </View>
 
       {/* Menu Section */}
       <View style={styles.menuWrapper}>
@@ -98,15 +72,13 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.menuText}>Map</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.iconContainer}>
               <Ionicons name="calendar" size={30} color="#A0C878" />
             </View>
             <Text style={styles.menuText}>Events</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/learn")}>
             <View style={styles.iconContainer}>
               <Ionicons name="book" size={30} color="#A0C878" />
             </View>
@@ -122,10 +94,7 @@ export default function HomeScreen() {
 
       {/* Clean-Up Section */}
       <View style={styles.cleanUpContainer}>
-        <Image 
-          source={require('../../assets/images/waste_nobg.png')}
-          style={styles.cleanUpBackgroundImage}
-        />
+        <Image source={require("../../assets/images/waste_nobg.png")} style={styles.cleanUpBackgroundImage} />
         <Ionicons name="warning" size={40} color="#FFA500" />
         <View>
           <Text style={styles.cleanUpText}>Reach up to 500</Text>
@@ -136,7 +105,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-    </View>
+    </View>  
   );
 }
 
@@ -312,7 +281,5 @@ const styles = StyleSheet.create({
     right: 3, // ✅ Shifted slightly to the right
     blurRadius: 10, // ✅ Real blur effect now working
     opacity: 0.5, // Slight opacity for a more subtle effect
-  },
-  
-  
+  }, 
 });
