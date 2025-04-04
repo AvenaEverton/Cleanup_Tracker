@@ -2,10 +2,13 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-nati
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { Audio, Video } from 'expo-av';
-
+import React, { useEffect } from "react";
+import { Alert } from "react-native";
+import io from "socket.io-client";
 const { width, height } = Dimensions.get("window");
 
 const isTablet = width > 600;
+const socket = io("http://192.168.1.206:5000")
 
 const logo = require("../assets/images/naslively.png");
 const videoSource = require("../assets/images/bg_waste_02.mp4"); // Replace with your video file
@@ -17,6 +20,24 @@ export default function IndexScreen() {
   const playSound = async (soundFile) => {
     const { sound } = await Audio.Sound.createAsync(soundFile);
     await sound.playAsync();
+  };
+
+  const App = () => {
+    useEffect(() => {
+      socket.on("newEvent", (event) => {
+        Alert.alert("New Event!", `An event "${event.eventName}" has been created.`);
+      });
+  
+      return () => {
+        socket.off("newEvent");
+      };
+    }, []);
+  
+    return (
+      <View>
+        <Text>Listening for new events...</Text>
+      </View>
+    );
   };
 
   return (

@@ -1,33 +1,112 @@
-import React, { useContext } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { ThemeContext } from "../../context/ThemeContext"; // ✅ Ensure correct path
+import React, { useEffect, useState } from "react";
+import { View, Text, FlatList, StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export default function NotificationsScreen() {
-  const { darkMode } = useContext(ThemeContext);
+const NotificationsScreen = () => {
+  const [notifications, setNotifications] = useState([]);
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUserIdAndNotifications = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const storedUserId = await AsyncStorage.getItem("userId");
+        if (storedUserId) {
+          console.log("Retrieved userId:", storedUserId);
+          setUserId(storedUserId);
+
+          console.log("API Query userId:", storedUserId);
+          const response = await fetch(
+            `http://192.168.1.206:5000/getNotifications?userId=${storedUserId}`
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          console.log("API Response Data:", data);
+          setNotifications(data.notifications); // Extract the notifications array
+        } else {
+          setError("userId not found in AsyncStorage");
+          console.error("userId not found in AsyncStorage");
+        }
+      } catch (err) {
+        setError(err.message || "Failed to fetch notifications");
+        console.error("❌ Fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserIdAndNotifications();
+  }, []);
+
+  const renderItem = ({ item }) => {
+    console.log("Rendering item:", item);
+    if (!item || typeof item !== "object") {
+      return (
+        <View style={styles.notificationItem}>
+          <Text style={styles.message}>Invalid Item: {JSON.stringify(item)}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.notificationItem}>
+        <Text style={styles.message}>{item.message || "No message"}</Text>
+        <Text style={styles.date}>
+          {item.created_at ? new Date(item.created_at).toLocaleString() : "No date"}
+        </Text>
+      </View>
+    );
+  };
 
   return (
-    <View style={[styles.container, darkMode && styles.darkContainer]}>
-      <Text style={[styles.title, darkMode && styles.darkText]}>Notifications Screen</Text>
+    <View style={styles.container}>
+      <Text style={styles.header}>Notifications</Text>
+      {loading && <Text>Loading notifications...</Text>}
+      {error && <Text style={{ color: "red" }}>Error: {error}</Text>}
+
+      {!loading && !error && notifications && notifications.length > 0 && (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item?.notif_id?.toString() || "uniqueId"}
+          renderItem={renderItem}
+        />
+      )}
+      {!loading && !error && (!notifications || notifications.length === 0) && (
+        <Text>No notifications to display.</Text>
+      )}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f4f4",
+    padding: 16,
+    backgroundColor: "#fff",
   },
-  darkContainer: {
-    backgroundColor: "#121212", // Dark mode background
-  },
-  title: {
-    fontSize: 24,
+  header: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    marginBottom: 10,
   },
-  darkText: {
-    color: "#ffffff", // White text for dark mode
+  notificationItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  message: {
+    fontSize: 16,
+  },
+  date: {
+    fontSize: 12,
+    color: "gray",
   },
 });
+
+export default NotificationsScreen;
