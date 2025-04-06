@@ -16,7 +16,7 @@ export default function AdminTabs() {
           if (route.name === "Home") iconName = "home";
           else if (route.name === "Events") iconName = "calendar";
           else if (route.name === "Users") iconName = "people";
-          else if (route.name === "Profile") iconName = "person";
+          else if (route.name === "Menu") iconName = "menu";
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -27,7 +27,7 @@ export default function AdminTabs() {
       <Tab.Screen name="Home" component={AdminHome} />
       <Tab.Screen name="Events" component={AdminEvents} />
       <Tab.Screen name="Users" component={AdminUsers} />
-      <Tab.Screen name="Profile" component={AdminProfile} />
+      <Tab.Screen name="Menu" component={AdminProfile} />
     </Tab.Navigator>
   );
 }
