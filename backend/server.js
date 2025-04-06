@@ -6,6 +6,9 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
 const http = require("http");
 const socketIo = require("socket.io");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +16,26 @@ const io = socketIo(server, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static("uploads"));
+
+// Set up storage for image uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = "uploads/";
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  },
+});
+
+// Initialize multer
+//dependency to install =  "npm install multer"
+const upload = multer({ storage: storage });
 
 const db = mysql.createConnection({
   host: "localhost",
@@ -58,45 +81,26 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.post("/api/register", async (req, res) => {
-  const { fullName, username, email, password, userType, idImagePath, createdAt, role } = req.body;
+  const { fullName, username, email, password, userType, idImagePath } = req.body;
+  console.log("Registration Request Body:", req.body); // Log the received data
 
-  console.log("Registration request body:", req.body);
-
-  if (!fullName || !username || !email || !password || !createdAt || !role) {
-    return res.status(400).json({ error: "All fields are required" });
+  if (!fullName || !username || !email || !password) {
+    return res.status(400).json({ message: "All fields are required!" });
   }
 
-  const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ error: "Invalid email format" });
-  }
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters long" });
-  }
+  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status)
+                   VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
 
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userSql = "INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')";
-
-    console.log("SQL query:", userSql);
-    const [result] = await db.promise().query(userSql, [fullName, username, email, hashedPassword, userType, idImagePath, createdAt, role]);
-
-    console.log("SQL query result:", result);
-
-    const userId = result.insertId;
-
-    res.json({ message: "User registered successfully", userId });
-  } catch (error) {
-    console.error("Registration error:", error);
-    if (error.sqlMessage) {
-      console.error("SQL error message:", error.sqlMessage);
+  db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
+    if (err) {
+      console.error("Database Error during registration:", err); // Log database errors
+      return res.status(500).json({ message: "Database error!" });
     }
-    if (error.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ error: "Email or username already exists" });
-    }
-    res.status(500).json({ error: "Internal server error" });
-  }
+    console.log("Registration successful:", result); // Log successful registration
+    res.status(201).json({ message: "Registration successful!" });
+  });
 });
 
 app.get("/api/admin/dashboard", (req, res) => {
@@ -269,9 +273,9 @@ app.get('/api/admin/users', async (req, res) => {
     console.log('SQL Query Result (users):', users);
 
     const countQueries = {
-      approved: `SELECT COUNT(*) as count FROM users WHERE status = "Approved" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
-      pending: `SELECT COUNT(*) as count FROM users WHERE status = "Pending" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
-      restricted: `SELECT COUNT(*) as count FROM users WHERE status = "Restricted" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+      approved: `SELECT COUNT(*) as count FROM users WHERE status = "approved" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+      pending: `SELECT COUNT(*) as count FROM users WHERE status = "pending" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
+      restricted: `SELECT COUNT(*) as count FROM users WHERE status = "restricted" ${filter !== 'All' ? `AND status = "${filter}"` : ''}`,
     };
 
     const countResults = await Promise.all(
@@ -361,5 +365,73 @@ app.post('/joinEvent', async (req, res) => {
   }
 });
 
+// Report Submission Route
+app.post("/api/reports", upload.array("images"), (req, res) => { //corrected the route to /api/reports
+  const { userId, latitude, longitude, description } = req.body;
+  const images = req.files;
+
+  const reportQuery = "INSERT INTO reports (user, latitude, longitude, description, timestamp) VALUES (?, ?, ?, ?, NOW())";
+
+  db.query(reportQuery, [userId, latitude, longitude, description], (err, result) => {
+    if (err) {
+      console.error("Error creating report:", err);
+      return res.status(500).json({ message: "Failed to create report" });
+    }
+
+    const reportId = result.insertId;
+
+    const imageQueries = images.map((image) => {
+      const imagePath = image.filename;
+      return new Promise((resolve, reject) => {
+        const imageQuery = "INSERT INTO report_images (report_id, image) VALUES (?, ?)";
+        db.query(imageQuery, [reportId, imagePath], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+
+    Promise.all(imageQueries)
+      .then(() => res.status(201).json({ message: "Report created successfully!" }))
+      .catch((err) => {
+        console.error("Error saving images:", err);
+        res.status(500).json({ message: "Failed to save images" });
+      });
+  });
+});
+
+// Endpoint to update user status (e.g., Approve or reject)
+app.put('/api/admin/users/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { status } = req.body;
+
+  console.log(`Updating user ${userId} to status: ${status}`);
+
+  // Validate the status
+  if (!status || (status !== 'Approved' && status !== 'Restricted')) {
+    return res.status(400).json({ error: 'Invalid status provided.' });
+  }
+
+  try {
+    // Use a parameterized query to prevent SQL injection
+    const sql = 'UPDATE users SET status = ? WHERE user_id = ?';
+    const params = [status, userId];
+
+    const [result] = await db.promise().query(sql, params);
+
+    // Check if the user was found and updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found or status not updated.' });
+    }
+
+    res.json({ message: 'User status updated successfully.' });
+
+  } catch (err) {
+    // Handle database errors
+    console.error('Error updating user status:', err);
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
 const PORT = 5000;
-server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.18:${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.17:${PORT}`));

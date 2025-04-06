@@ -27,7 +27,7 @@ const AdminEvents = () => {
 
   const handleCreateEvent = async () => {
     try {
-      const response = await axios.post("http://192.168.1.18:5000/addEvent", {
+      const response = await axios.post("http://192.168.1.17:5000/addEvent", {
         eventName,
         description,
         date: date.toISOString().split("T")[0], // YYYY-MM-DD
