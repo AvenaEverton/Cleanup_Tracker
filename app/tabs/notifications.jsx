@@ -32,7 +32,7 @@ const NotificationsScreen = () => {
     console.log("API Query userId:", currentUserId);
     try {
       const response = await fetch(
-        `http://192.168.1.18:5000/getNotifications?userId=${currentUserId}`
+        `http://192.168.1.17:5000/getNotifications?userId=${currentUserId}`
       );
 
       if (!response.ok) {
@@ -93,7 +93,7 @@ const NotificationsScreen = () => {
 
   const fetchEventDetails = async (eventId) => {
     try {
-      const response = await fetch(`http://192.168.1.18:5000/events/${eventId}`);
+      const response = await fetch(`http://192.168.1.17:5000/events/${eventId}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -172,7 +172,7 @@ const NotificationsScreen = () => {
     }
     setIsJoining(true);
     try {
-      const response = await fetch(`http://192.168.1.18:5000/joinEvent`, {
+      const response = await fetch(`http://192.168.1.17:5000/joinEvent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

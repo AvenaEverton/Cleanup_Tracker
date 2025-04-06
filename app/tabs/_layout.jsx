@@ -31,10 +31,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="events"
           options={{
-            title: "Events",
+            title: "Report",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar-outline" size={size} color={color} />
-            ),
+              <Ionicons name="document-text-outline" size={size} color={color} />
+            )
           }}
         />
 
