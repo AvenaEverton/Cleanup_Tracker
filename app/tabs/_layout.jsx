@@ -1,10 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useContext } from "react";
-import { ThemeContext } from "../../context/ThemeContext"; // Ensure correct path
-import { View, StyleSheet } from "react-native";
+import { useContext, useEffect, useRef } from "react";
+import { ThemeContext } from "../../context/ThemeContext";
+import { View, StyleSheet, Animated, Easing, Text } from "react-native"; // Import Text
+// import { ProfileProvider } from "../../context/ProfileContext"; // Removed ProfileProvider import
 
-export default function TabsLayout() {
+const TabsLayout = () => {
   const { darkMode } = useContext(ThemeContext);
 
   return (
@@ -14,26 +15,27 @@ export default function TabsLayout() {
           headerShown: false,
           tabBarStyle: darkMode ? styles.darkTabBar : styles.lightTabBar,
           tabBarActiveTintColor: darkMode ? "#ffffff" : "#000000",
+          tabBarInactiveTintColor: darkMode ? "#888888" : "#777777",
         }}
       >
         {/* Home Tab */}
         <Tabs.Screen
           name="home"
           options={{
-            title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" size={size} color={color} />
+            tabBarLabel: () => <Text>Home</Text>, // Use a function that returns the Text component
+            tabBarIcon: ({ focused, color, size }) => (
+              <ShiningIcon name="home" focused={focused} size={size} color={color} />
             ),
           }}
         />
 
-        {/* Events Tab */}
+        {/* Reports Tab */}
         <Tabs.Screen
-          name="events"
+          name="report"
           options={{
-            title: "Events",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar-outline" size={size} color={color} />
+            tabBarLabel: () => <Text>Reports</Text>, // Use a function that returns the Text component
+            tabBarIcon: ({ focused, color, size }) => (
+              <ShiningIcon name="document-text" focused={focused} size={size} color={color} />
             ),
           }}
         />
@@ -42,9 +44,9 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="notifications"
           options={{
-            title: "Notifications",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="notifications-outline" size={size} color={color} />
+            tabBarLabel: () => <Text>Notifications</Text>, // Use a function that returns the Text component
+            tabBarIcon: ({ focused, color, size }) => (
+              <ShiningIcon name="notifications" focused={focused} size={size} color={color} />
             ),
           }}
         />
@@ -53,16 +55,68 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-outline" size={size} color={color} />
+            tabBarLabel: () => <Text>Profile</Text>, // Use a function that returns the Text component
+            tabBarIcon: ({ focused, color, size }) => (
+              <ShiningIcon name="person" focused={focused} size={size} color={color} />
             ),
           }}
         />
       </Tabs>
     </View>
   );
-}
+};
+
+// ... (rest of your ShiningIcon and styles components - no changes needed here)
+// ... (rest of your ShiningIcon and styles components - no changes needed here)
+
+const ShiningIcon = ({ name, focused, size, color }) => {
+  const shineAnim = useRef(new Animated.Value(1)).current;
+  const animationRef = useRef(null);
+
+  useEffect(() => {
+    if (focused) {
+      animationRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shineAnim, {
+            toValue: 1.3, // Slightly scale up
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(shineAnim, {
+            toValue: 1, // Back to normal size
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animationRef.current.start();
+    } else {
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+      shineAnim.setValue(1);
+    }
+
+    return () => {
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+    };
+  }, [focused]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: shineAnim }],
+        opacity: focused ? 1 : 0.7, // Slight opacity difference
+      }}
+    >
+      <Ionicons name={focused ? name : `${name}-outline`} size={size} color={color} />
+    </Animated.View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -83,3 +137,5 @@ const styles = StyleSheet.create({
     borderTopColor: "#444444",
   },
 });
+
+export default TabsLayout;

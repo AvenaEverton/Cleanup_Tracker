@@ -31,26 +31,42 @@ db.connect((err) => {
 
 app.post("/api/login", async (req, res) => {
   const { emailOrUsername, password } = req.body;
+  console.log("Login attempt for:", emailOrUsername);
 
   if (!emailOrUsername || !password) {
     return res.status(400).json({ error: "Email/Username and password are required" });
   }
 
   try {
-    const userSql = "SELECT * FROM users WHERE email = ? OR username = ?";
+    const userSql = "SELECT user_id, username, role, status, password FROM users WHERE email = ? OR username = ?";
+    console.log("Executing SQL:", userSql, [emailOrUsername, emailOrUsername]);
     const [user] = await db.promise().query(userSql, [emailOrUsername, emailOrUsername]);
+    console.log("Query results:", user);
 
     if (!user || user.length === 0) {
+      console.log("User not found");
       return res.status(401).json({ error: "User not found" });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user[0].password);
-    if (!passwordMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    // Check if user[0] and user[0].password exist before comparing
+    if (user[0] && user[0].password) {
+      console.log("Plain password from request:", password);
+      console.log("Hashed password from database:", user[0].password);
 
-    const { user_id, role, status } = user[0];
-    res.json({ success: true, user: { user_id, role, status } });
+      const passwordMatch = await bcrypt.compare(password, user[0].password);
+
+      if (!passwordMatch) {
+        console.log("Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const { user_id, username: dbUsername, role, status } = user[0];
+      console.log("Login successful for user:", dbUsername, user_id, role, status);
+      res.json({ success: true, user: { user_id, username: dbUsername, role, status } });
+    } else {
+      console.error("Error: Password not found for user:", emailOrUsername);
+      return res.status(500).json({ error: "Internal server error: Password missing from database" });
+    }
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -66,8 +82,8 @@ app.post("/api/register", async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
+  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status)
+                  VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
 
   db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
     if (err) {
@@ -152,9 +168,9 @@ app.get("/getNotifications", (req, res) => {
   }
 
   const sql = `
-    SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at 
-    FROM notifications 
-    WHERE user_id = ? 
+    SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at
+    FROM notifications
+    WHERE user_id = ?
     ORDER BY created_at DESC`;
 
   db.query(sql, [userId], (err, results) => {
@@ -267,4 +283,4 @@ app.get('/api/admin/users', async (req, res) => {
 });
 
 const PORT = 5000;
-server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.206:${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.19:${PORT}`));

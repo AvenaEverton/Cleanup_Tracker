@@ -1,7 +1,7 @@
 // LoginScreen.jsx
 import React, { useState } from "react";
-import { 
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated 
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -11,12 +11,12 @@ import axios from "axios";
 const LoginScreen = () => {
   const router = useRouter();
   const scaleValue = new Animated.Value(1);
-  
-  const [email, setEmail] = useState("");
+
+  const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
-  
+
   const handleLogin = async () => {
-    if (!email) {
+    if (!emailOrUsername) {
       Alert.alert("Error", "Please enter email or username");
       return;
     }
@@ -26,17 +26,17 @@ const LoginScreen = () => {
     }
 
     try {
-      const response = await axios.post("http://192.168.1.206:5000/api/login", {
-        emailOrUsername: email,
+      const response = await axios.post("http://192.168.1.19:5000/api/login", {
+        emailOrUsername,
         password,
       });
 
       if (response.data.success) {
-        const user = response.data.user; // Get the user object
+        const user = response.data.user;
 
         if (user.status === "pending") {
           Alert.alert("Account Pending", "Your account is still under review by the administrator. Please wait for approval.");
-          return; // Stop the login process
+          return;
         }
 
         const userId = String(user.user_id);
@@ -46,7 +46,10 @@ const LoginScreen = () => {
         if (user.role === "admin") {
           router.replace("/AdminTabs/Admin_home");
         } else {
-          router.replace("/tabs/home");
+          router.replace({
+            pathname: "/tabs/home",
+            params: { username: user.username }, // Pass the username as a parameter
+          });
         }
       } else {
         Alert.alert("Login Failed", response.data.message || "Invalid credentials");
@@ -56,7 +59,7 @@ const LoginScreen = () => {
       Alert.alert("Error", "Network error. Please try again.");
     }
   };
-    
+
   const handleBack = () => {
     router.replace('/');
   };
@@ -64,16 +67,16 @@ const LoginScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
-      
+
       <TextInput
         style={styles.input}
         placeholder="Email or Username"
-        value={email}
-        onChangeText={setEmail}
+        value={emailOrUsername}
+        onChangeText={setEmailOrUsername}
         keyboardType="email-address"
         autoCapitalize="none"
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -81,19 +84,19 @@ const LoginScreen = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      
+
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-      
-      <TouchableOpacity style={styles.registerButton} onPress={() => router.push("/register")}> 
+
+      <TouchableOpacity style={styles.registerButton} onPress={() => router.push("/register")}>
         <Text style={styles.registerButtonText}>Create an Account</Text>
       </TouchableOpacity>
-      
+
       <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={20} color="#008000" />
-          <Text style={styles.backButtonText}>Back to Home</Text>
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>

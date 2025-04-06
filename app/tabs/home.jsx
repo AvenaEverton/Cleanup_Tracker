@@ -1,12 +1,21 @@
-import React, { useContext, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from "react-native";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import {
+  View, Text, TextInput, TouchableOpacity, Image, Animated,
+  Easing, StyleSheet
+} from "react-native";
 import { ThemeContext } from "../../context/ThemeContext";
-import { Ionicons } from '@expo/vector-icons';
-import { Animated, Easing  } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useLocalSearchParams } from "expo-router";
+// import { ProfileContext } from "../../context/ProfileContext"; // Removed ProfileContext import
 
 export default function HomeScreen() {
   const { darkMode } = useContext(ThemeContext);
+  // const { profilePicture } = useContext(ProfileContext); // Removed profilePicture context
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const router = useRouter();
+  const { username: routeUsername } = useLocalSearchParams();
+  const [username, setUsername] = useState(routeUsername || "Guest"); // Initialize with routeUsername or Guest
+  const [localProfilePicture, setLocalProfilePicture] = useState(null); // Local state for profile picture
 
   useEffect(() => {
     Animated.loop(
@@ -22,72 +31,46 @@ export default function HomeScreen() {
           duration: 2000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
-        })
+        }),
       ])
     ).start();
-  }, []);
-  
-  const rotate = waveAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-15deg', '15deg'] // ✅ Natural human wave na super soft
-  });
-  
+  }, [waveAnim]); // Removed dependencies related to firstName and username
+
   return (
     <View style={[styles.container, darkMode ? styles.darkBackground : styles.lightBackground]}>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Search..."
-          placeholderTextColor="#999"
-        />
+        <TextInput style={styles.searchInput} placeholder="Search..." placeholderTextColor="#999" />
         <Ionicons name="search" size={20} color="#666" />
       </View>
 
-{/* Header Background */}
-<View style={styles.headerBackground}>
-  <View style={styles.overlayContent}>
-    <View style={styles.greetingContainer}>
-    <Text 
-  style={[
-    styles.greetingText, 
-    darkMode ? styles.darkText : styles.lightText, 
-    { transform: [{ translateY: 30 }] } // ✅ Shifted down by 10 pixels
-  ]}
->
-  Hello!
-</Text>
-
-<Animated.Text
-  style={{
-    fontSize: 32,
-    marginLeft: 50, // ✅ Still nasa kanan
-    marginTop: -15, // ✅ Slightly tinaas ng onti lang
-    transform: [
-      { rotate: waveAnim.interpolate({
-          inputRange: [-1, 1],
-          outputRange: ['-30deg', '30deg']
-        })
-      }
-    ]
-  }}
->
-  👋
-</Animated.Text>
-
-
-      <Text style={[styles.usernameText, darkMode ? styles.darkText : styles.lightText]}>
-        "Username"
-      </Text>
-    </View>
-    <TouchableOpacity style={styles.profileIcon}>
-      <Ionicons name="person-circle" size={70} color="#F7F7F7" />
-    </TouchableOpacity>
-  </View>
-</View>
-
-
+      {/* Header Background */}
+      <View style={styles.headerBackground}>
+        <View style={styles.overlayContent}>
+          <View style={styles.greetingContainer}>
+            <Text style={[styles.greetingText]}>
+              Hello!
+            </Text>
+            <Animated.Text style={{ fontSize: 32, marginLeft: 50, marginTop: -40 }}>
+              <Text>👋</Text>
+            </Animated.Text>
+            <Text style={[styles.usernameText]}>
+              {username}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/tabs/profile")}
+            style={{ marginTop: -30 }}
+          >
+            {localProfilePicture ? (
+              <Image source={{ uri: localProfilePicture }} style={styles.profileIcon} />
+            ) : (
+              <Ionicons name="person-circle" size={70} color="#F7F7F7" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Menu Section */}
       <View style={styles.menuWrapper}>
@@ -98,15 +81,13 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.menuText}>Map</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.iconContainer}>
               <Ionicons name="calendar" size={30} color="#A0C878" />
             </View>
             <Text style={styles.menuText}>Events</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/learn")}>
             <View style={styles.iconContainer}>
               <Ionicons name="book" size={30} color="#A0C878" />
             </View>
@@ -122,10 +103,7 @@ export default function HomeScreen() {
 
       {/* Clean-Up Section */}
       <View style={styles.cleanUpContainer}>
-        <Image 
-          source={require('../../assets/images/waste_nobg.png')}
-          style={styles.cleanUpBackgroundImage}
-        />
+        <Image source={require("../../assets/images/waste_nobg.png")} style={styles.cleanUpBackgroundImage} />
         <Ionicons name="warning" size={40} color="#FFA500" />
         <View>
           <Text style={styles.cleanUpText}>Reach up to 500</Text>
@@ -139,7 +117,7 @@ export default function HomeScreen() {
     </View>
   );
 }
-
+// ... (rest of your styles - no changes needed here)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -151,6 +129,12 @@ const styles = StyleSheet.create({
   },
   darkBackground: {
     backgroundColor: "#121212",
+  },
+  darkText: {
+    color: "#F7F7F7",
+  },
+  lightText: {
+    color: "#121212",
   },
   headerBackground: {
     height: 200,
@@ -180,23 +164,23 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#FFFFFF",
+    color: "#FFFFFF", // ✅ Changed color to white
     textShadowColor: "#000000",
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 3,
     marginRight: 80, // ✅ Shifted slightly to the left
-    marginTop: -10,    // ✅ Slightly lowered the "Hello!" text
+    marginTop: -10,     // ✅ Slightly lowered the "Hello!" text
   },
-  
+
   usernameText: {
     fontSize: 36,
-    color: "#FBFBFB",
+    color: "#FFFFFF", // ✅ Changed color to white
     fontWeight: "bold",
   },
   profileIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 70, // Match the Ionicons size
+    height: 70,
+    borderRadius: 35,
   },
   searchContainer: {
     flexDirection: "row",
@@ -264,7 +248,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  
+
   cleanUpContainer: {
     backgroundColor: "#3559E0",
     borderRadius: 10,
@@ -284,7 +268,7 @@ const styles = StyleSheet.create({
     elevation: 5, // ✅ Adds an elevation effect
     zIndex: 999, // ✅ Force it to stay on top
   },
-  
+
   cleanUpCount: {
     fontSize: 24, // ✅ Slightly increased size
     fontWeight: "bold",
@@ -293,7 +277,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 }, // ✅ Slight offset for depth
     textShadowRadius: 5, // ✅ Smooth blur effect
   },
-  
+
   joinButton: {
     backgroundColor: "#008000",
     paddingVertical: 10,
@@ -311,8 +295,6 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     right: 3, // ✅ Shifted slightly to the right
     blurRadius: 10, // ✅ Real blur effect now working
-    opacity: 0.5, // Slight opacity for a more subtle effect
+    opacity: 0.5, // Slight opacity for a more subtle
   },
-  
-  
 });
