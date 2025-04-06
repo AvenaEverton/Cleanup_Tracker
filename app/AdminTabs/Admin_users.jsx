@@ -14,36 +14,67 @@ const AdminUsers = () => {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('All');
 
-  useEffect(() => {
-    const fetchUsersData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log('Fetching users with filter:', filter);
-        const response = await axios.get(`http://192.168.1.206:5000/api/admin/users?filter=${filter}`);
-        console.log('API Response:', response.data);
+  const fetchUsersData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('Fetching users with filter:', filter);
+      const response = await axios.get(`http://192.168.1.18:5000/api/admin/users?filter=${filter}`);
+      console.log('API Response:', response.data);
 
-        if (response.data) {
-          setUsers(response.data.users);
-          setApprovedCount(response.data.approvedCount);
-          setPendingCount(response.data.pendingCount);
-          setRestrictedCount(response.data.restrictedCount);
-          setTotalUsers(response.data.totalUsers);
-        } else {
-          setError('Failed to fetch user data');
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err.response); // Added err.response
+      if (response.data) {
+        setUsers(response.data.users);
+        setApprovedCount(response.data.approvedCount);
+        setPendingCount(response.data.pendingCount);
+        setRestrictedCount(response.data.restrictedCount);
+        setTotalUsers(response.data.totalUsers);
+      } else {
         setError('Failed to fetch user data');
-        Alert.alert('Error', 'Failed to fetch user data. Please try again.');
-      } finally {
-        setLoading(false);
-        console.log('Loading state set to false');
       }
-    };
+    } catch (err) {
+      console.error('Error fetching user data:', err.response);
+      setError('Failed to fetch user data');
+      Alert.alert('Error', 'Failed to fetch user data. Please try again.');
+    } finally {
+      setLoading(false);
+      console.log('Loading state set to false');
+    }
+  };
 
+  useEffect(() => {
     fetchUsersData();
   }, [filter]);
+
+  const handleStatusUpdate = async (userId, newStatus) => {
+    try {
+      await axios.post(`http://192.168.1.18:5000/api/admin/users/${userId}/status`, { status: newStatus });
+      fetchUsersData();
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      Alert.alert('Error', 'Failed to update user status.');
+    }
+  };
+
+  const handleOptionsPress = (user) => {
+    const options = user.status === 'Approved' ? ['Restrict'] : ['Approve', 'Reject'];
+    Alert.alert(
+      'Options',
+      `Select an option for ${user.username}`,
+      options.map((option) => ({
+        text: option,
+        onPress: () => {
+          if (option === 'Approve') {
+            handleStatusUpdate(user.user_id, 'Approved');
+          } else if (option === 'Reject') {
+            handleStatusUpdate(user.user_id, 'Restricted');
+          } else if (option === 'Restrict') {
+            handleStatusUpdate(user.user_id, 'Restricted');
+          }
+        },
+      })),
+      { cancelable: true }
+    );
+  };
 
   if (loading) {
     return (
@@ -93,7 +124,8 @@ const AdminUsers = () => {
                 <Ionicons name="people-outline" size={24} color="black" />
               </View>
               <Text style={styles.username}>{user.username}</Text>
-              <TouchableOpacity style={styles.optionsIcon}>
+              <Text style={styles.userStatus}>{user.status}</Text>
+              <TouchableOpacity style={styles.optionsIcon} onPress={() => handleOptionsPress(user)}>
                 <Ionicons name="ellipsis-vertical-outline" size={24} color="black" />
               </TouchableOpacity>
             </View>
@@ -199,6 +231,10 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
   },
+  userStatus: {
+    fontSize: 14,
+    marginHorizontal: 10,
+  }
 });
 
 export default AdminUsers;

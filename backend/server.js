@@ -58,24 +58,45 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.post("/api/register", async (req, res) => {
-  const { fullName, username, email, password, userType, idImagePath } = req.body;
+  const { fullName, username, email, password, userType, idImagePath, createdAt, role } = req.body;
 
-  if (!fullName || !username || !email || !password) {
-    return res.status(400).json({ message: "All fields are required!" });
+  console.log("Registration request body:", req.body);
+
+  if (!fullName || !username || !email || !password || !createdAt || !role) {
+    return res.status(400).json({ error: "All fields are required" });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
 
-  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
+  if (password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters long" });
+  }
 
-  db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ message: "Database error!" });
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userSql = "INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')";
+
+    console.log("SQL query:", userSql);
+    const [result] = await db.promise().query(userSql, [fullName, username, email, hashedPassword, userType, idImagePath, createdAt, role]);
+
+    console.log("SQL query result:", result);
+
+    const userId = result.insertId;
+
+    res.json({ message: "User registered successfully", userId });
+  } catch (error) {
+    console.error("Registration error:", error);
+    if (error.sqlMessage) {
+      console.error("SQL error message:", error.sqlMessage);
     }
-    res.status(201).json({ message: "Registration successful!" });
-  });
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "Email or username already exists" });
+    }
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.get("/api/admin/dashboard", (req, res) => {
@@ -152,9 +173,9 @@ app.get("/getNotifications", (req, res) => {
   }
 
   const sql = `
-    SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at 
-    FROM notifications 
-    WHERE user_id = ? 
+    SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at
+    FROM notifications
+    WHERE user_id = ?
     ORDER BY created_at DESC`;
 
   db.query(sql, [userId], (err, results) => {
@@ -216,6 +237,22 @@ app.get("/events", (req, res) => {
   });
 });
 
+app.get("/events/:id", (req, res) => {
+  const { id } = req.params;
+  const sql = "SELECT * FROM events WHERE event_id = ?";
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("Error fetching event details:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).json({ message: "Event not found" });
+    }
+  });
+});
+
 app.get('/api/admin/users', async (req, res) => {
   const filter = req.query.filter;
   let sql = 'SELECT user_id, username, status FROM users';
@@ -266,5 +303,63 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
+app.post('/api/admin/users/:userId/status', async (req, res) => {
+  const { userId } = req.params;
+  const { status } = req.body;
+
+  if (!userId || !status || !['Approved', 'Restricted'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  try {
+    const sql = 'UPDATE users SET status = ? WHERE user_id = ?';
+    await db.promise().query(sql, [status, userId]);
+    res.json({ message: 'User status updated successfully' });
+  } catch (err) {
+    console.error('Error updating user status:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// New API endpoint to handle joining an event
+app.post('/joinEvent', async (req, res) => {
+  const { userId, eventId } = req.body;
+
+  if (!userId || !eventId) {
+    return res.status(400).json({ message: 'User ID and Event ID are required.' });
+  }
+
+  try {
+    const connection = await db.promise();
+
+    // Check if the user has already joined the event
+    const [existingParticipation] = await connection.execute(
+      'SELECT * FROM event_participants WHERE user_id = ? AND event_id = ?',
+      [userId, eventId]
+    );
+
+    if (existingParticipation.length > 0) {
+      return res.status(409).json({ message: 'You have already joined this event.' });
+    }
+
+    // Insert the new participation record
+    await connection.execute(
+      'INSERT INTO event_participants (user_id, event_id) VALUES (?, ?)',
+      [userId, eventId]
+    );
+
+    res.status(200).json({ message: 'Successfully joined the event.' });
+
+  } catch (error) {
+    console.error('Error joining event:', error);
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({ message: 'Database error: The event_participants table does not exist.' });
+    } else if (error.code === 'ER_FK_CONSTRAINT_FOREIGN_KEY') {
+      return res.status(400).json({ message: 'Invalid User ID or Event ID.' });
+    }
+    res.status(500).json({ message: 'Failed to join the event.' });
+  }
+});
+
 const PORT = 5000;
-server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.206:${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.18:${PORT}`));
