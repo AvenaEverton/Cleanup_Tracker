@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Switch,
   TouchableWithoutFeedback,
-  TextInput,
   Image,
   ScrollView,
   Dimensions,
@@ -18,21 +17,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../context/ThemeContext";
 import Icon from "react-native-vector-icons/FontAwesome";
-// import { ProfileContext } from "../../context/ProfileContext"; // Removed ProfileContext import
 
 const APP_VERSION = "1.0.0";
 
 const ProfileScreen = () => {
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useContext(ThemeContext);
-  // Removed ProfileContext usage
   const [showSettings, setShowSettings] = useState(false);
   const [reportCount, setReportCount] = useState(0);
   const [eventCount, setEventCount] = useState(0);
-  const [showEditProfile, setShowEditProfile] = useState(false); // Controls edit mode
-  const [firstName, setFirstName] = useState("John"); // Initialize with default value
-  const [lastName, setLastName] = useState("Doe"); // Initialize with default value
-  const [profilePicture, setProfilePicture] = useState(null); // Local state for profile picture
+  const [firstName, setFirstName] = useState("John");
+  const [lastName, setLastName] = useState("Doe");
+  const [profilePicture, setProfilePicture] = useState(null);
   const rotationAnim = useRef(new Animated.Value(0)).current;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -61,7 +57,6 @@ const ProfileScreen = () => {
     setShowSettings(!showSettings);
   };
 
-  // Logout function
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem("userToken");
@@ -71,40 +66,22 @@ const ProfileScreen = () => {
     }
   };
 
-  // Toggle Edit Profile Mode
-  const toggleEditProfile = () => {
-    setShowEditProfile(!showEditProfile);
-    // Reset local state when entering edit mode (optional, adjust as needed)
-    if (!showEditProfile) {
-      // You might want to fetch the current user data here if needed
-      setFirstName("John"); // Reset to default or fetched value
-      setLastName("Doe"); // Reset to default or fetched value
-      setProfilePicture(null); // Reset to default or fetched value
-    }
+  const handleEditProfile = () => {
+    router.push("/EditProfileScreen");
   };
 
-  // Select Image from Gallery (only active in edit mode)
   const handleImageSelect = async () => {
-    if (showEditProfile) {
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
 
-      if (!result.canceled) {
-        setProfilePicture(result.assets[0].uri);
-      }
+    if (!result.canceled) {
+      setProfilePicture(result.assets[0].uri);
+      console.log("New profile picture URI:", result.assets[0].uri);
     }
-  };
-
-  // Save Profile (for local state)
-  const handleSaveProfile = () => {
-    // Here you would typically send the updated firstName, lastName, and profilePicture
-    // to your backend or update local storage. For this example, we're just toggling
-    console.log("Saving profile:", firstName, lastName, profilePicture);
-    setShowEditProfile(false);
   };
 
   const screenHeight = Dimensions.get("window").height;
@@ -163,8 +140,8 @@ const ProfileScreen = () => {
         </View>
 
         {/* Profile Icon/Image */}
-        <TouchableOpacity onPress={handleImageSelect} disabled={!showEditProfile}>
-          <View style={{ alignItems: "center", marginTop: 80, marginBottom: 15 }}>
+        <View style={styles.profileContainer}>
+          <View style={styles.profileIconWrapper}>
             {profilePicture ? (
               <Image source={{ uri: profilePicture }} style={styles.profileIcon} />
             ) : (
@@ -172,45 +149,14 @@ const ProfileScreen = () => {
                 <Icon name="user-circle" size={80} color={darkMode ? "#ddd" : "#777"} />
               </View>
             )}
-            {showEditProfile && (
-              <View style={styles.editIconContainer}>
-                <Icon name="pencil" size={20} color="white" />
-              </View>
-            )}
           </View>
-        </TouchableOpacity>
-
-        {showEditProfile ? (
-          <View style={{ alignItems: "center" }}>
-            <TextInput
-              style={[styles.input, darkMode ? styles.darkInput : styles.lightInput]}
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="First Name"
-            />
-            <TextInput
-              style={[styles.input, darkMode ? styles.darkInput : styles.lightInput]}
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Last Name"
-            />
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-              <Text style={styles.saveButtonText}>Save Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={toggleEditProfile}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={{ alignItems: "center" }}>
-            <Text style={[styles.title, darkMode ? styles.darkText : styles.lightText]}>
-              {firstName} {lastName}
-            </Text>
-            <TouchableOpacity style={styles.editProfileButton} onPress={toggleEditProfile}>
-              <Text style={styles.editProfileText}>Edit Profile</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <Text style={[styles.title, darkMode ? styles.darkText : styles.lightText]}>
+            {firstName} {lastName}
+          </Text>
+          <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfile}>
+            <Text style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Stats */}
         <View style={styles.statsContainer}>
@@ -275,6 +221,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   settingsIcon: { padding: 5 },
+  profileContainer: {
+    alignItems: "center",
+    marginTop: 80,
+    marginBottom: 15,
+  },
+  profileIconWrapper: {
+    position: "relative",
+  },
   profileIconPlaceholder: {
     width: 100,
     height: 100,
@@ -282,7 +236,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "lightgray", // Optional background for visual debugging
+    backgroundColor: "lightgray",
   },
   profileIcon: {
     width: 100,
@@ -393,48 +347,6 @@ const styles = StyleSheet.create({
     height: 150,
     backgroundColor: "#ccc",
     borderRadius: 10,
-  },
-  input: {
-    height: 40,
-    marginVertical: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    borderRadius: 5,
-    width: "80%",
-  },
-  darkInput: {
-    borderColor: "#555",
-    color: "#fff",
-    backgroundColor: "#333",
-  },
-  lightInput: {
-    borderColor: "#ccc",
-    color: "#333",
-    backgroundColor: "#fff",
-  },
-  saveButton: {
-    backgroundColor: "#28a745",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  saveButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#dc3545",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginTop: 5,
-  },
-  cancelButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    textAlign: "center",
   },
   editIconContainer: {
     position: "absolute",

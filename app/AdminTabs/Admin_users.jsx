@@ -78,17 +78,15 @@ const AdminUsers = () => {
       case 'Restricted':
         return styles.restrictedUserContent;
       default:
-        return {};
+        return styles.allUserContent; // Apply a default style for "All" or any other status
     }
   };
 
   const renderUserItem = ({ item }) => (
     <View style={[styles.userItem, getUserItemStyle(item.status)]}>
       <View style={styles.userIcon}>
-        <View style={styles.profilePlaceholder}>
-          <View style={styles.profileIconLines} />
-          <View style={styles.profileIconLines} />
-          <View style={styles.profileIconCircle} />
+        <View style={styles.profileAvatar}>
+          <Ionicons name="person-outline" size={24} color="#333" />
         </View>
       </View>
       <Text style={styles.username}>{item.username}</Text>
@@ -99,15 +97,24 @@ const AdminUsers = () => {
   );
 
   const getSummaryContainerStyle = (status) => {
+    const baseStyle = {
+      borderRadius: 5,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      marginLeft: 10,
+      width: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    };
     switch (status) {
       case 'Approved':
-        return styles.approvedSummaryContainer;
+        return { ...baseStyle, backgroundColor: '#d4edda' };
       case 'Pending':
-        return styles.pendingSummaryContainer;
+        return { ...baseStyle, backgroundColor: '#e7f3ff' };
       case 'Restricted':
-        return styles.restrictedSummaryContainer;
+        return { ...baseStyle, backgroundColor: '#f8d7da' };
       default:
-        return {};
+        return baseStyle;
     }
   };
 
@@ -124,11 +131,11 @@ const AdminUsers = () => {
         <View style={styles.controlCenter}>
           <Text style={styles.controlCenterTitle}>User Control Center</Text>
           <View style={styles.filterSortBar}>
-            <View style={styles.filterInfo}>
-              <Text style={styles.filterLabel}>Filter:</Text>
-              <Text style={styles.filterValue}>{filter}</Text>
-            </View>
             <View style={styles.filterContainer}>
+              <View style={styles.filterInfo}>
+                <Text style={styles.filterLabel}>Filter:</Text>
+                <Text style={styles.filterValue}>{filter}</Text>
+              </View>
               <Picker
                 selectedValue={filter}
                 style={styles.filterPicker}
@@ -141,11 +148,11 @@ const AdminUsers = () => {
                 <Picker.Item label="Restricted" value="Restricted" />
               </Picker>
             </View>
-            <View style={styles.sortInfo}>
-              <Text style={styles.sortLabel}>Sort by:</Text>
-              <Text style={styles.sortValue}>{sortBy}</Text>
-            </View>
             <View style={styles.sortContainer}>
+              <View style={styles.sortInfo}>
+                <Text style={styles.sortLabel}>Sort by:</Text>
+                <Text style={styles.sortValue}>{sortBy}</Text>
+              </View>
               <Picker
                 selectedValue={sortBy}
                 style={styles.sortPicker}
@@ -263,9 +270,17 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     overflow: 'hidden',
     marginRight: 10,
+    minWidth: 120,
+    position: 'relative', // Added position relative
   },
   filterPicker: {
     height: 40,
+    position: 'absolute',  // Added position absolute
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0, // Make it invisible
   },
   sortInfo: {
     flexDirection: 'row',
@@ -286,9 +301,16 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     overflow: 'hidden',
     width: 120,
+    position: 'relative', // Added
   },
   sortPicker: {
     height: 40,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
   },
   userListContainer: {
     flex: 1,
@@ -314,25 +336,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     marginBottom: 5,
   },
-  profilePlaceholder: {
+  profileAvatar: {
     width: 30,
     height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ddd',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  profileIconLines: {
-    width: 15,
-    height: 2,
-    backgroundColor: 'black',
-    marginBottom: 2,
-  },
-  profileIconCircle: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'black',
-    position: 'absolute',
-    top: 7,
   },
   username: {
     fontSize: 14,
@@ -399,6 +409,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     marginLeft: 10,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   approvedSummaryContainer: {
     backgroundColor: '#d4edda',
@@ -417,6 +430,9 @@ const styles = StyleSheet.create({
   },
   restrictedUserContent: {
     backgroundColor: '#f8d7da',
+  },
+  allUserContent: {
+    backgroundColor: '#e0e0e0',
   },
 });
 
