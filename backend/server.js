@@ -283,4 +283,4 @@ app.get('/api/admin/users', async (req, res) => {
 });
 
 const PORT = 5000;
-server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.19:${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.12:${PORT}`));

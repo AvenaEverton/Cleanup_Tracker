@@ -34,7 +34,7 @@ const NotificationsScreen = () => {
 
           console.log("API Query userId:", storedUserId);
           const response = await fetch(
-            `http://192.168.1.19:5000/getNotifications?userId=${storedUserId}`
+            `http://192.168.1.12:5000/getNotifications?userId=${storedUserId}`
           );
 
           if (!response.ok) {

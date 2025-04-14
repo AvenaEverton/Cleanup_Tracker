@@ -23,7 +23,7 @@ const AdminUsers = () => {
       try {
         console.log('Fetching users with filter:', filter, 'Sort by:', sortBy);
         const response = await axios.get(
-          `http://192.168.1.19:5000/api/admin/users?filter=${filter}&sortBy=${sortBy}`
+          `http://192.168.1.12:5000/api/admin/users?filter=${filter}&sortBy=${sortBy}`
         );
         console.log('API Response:', response.data);
 

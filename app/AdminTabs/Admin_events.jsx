@@ -239,7 +239,7 @@ const AdminEvents = () => {
                 });
             });
 
-            const response = await axios.post("http://192.168.1.19:5000/addEvent", formData, {
+            const response = await axios.post("http://192.168.1.12:5000/addEvent", formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

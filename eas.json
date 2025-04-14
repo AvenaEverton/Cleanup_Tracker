@@ -20,8 +20,8 @@
         "buildType": "app-bundle"
       }
     }
-  },
+  }, 
   "submit": {
-    "production": {}
+    "production": {} 
   }
 }
