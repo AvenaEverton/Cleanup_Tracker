@@ -10,7 +10,6 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
-    "start":"node server.js""start":"node server.js"
   },
   "jest": {
     "preset": "jest-expo"
