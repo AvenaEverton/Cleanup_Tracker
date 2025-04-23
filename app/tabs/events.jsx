@@ -1,5 +1,3 @@
-//npm install @expo/vector-icons react-native-maps expo-location expo-image-picker @react-native-async-storage/async-storage axios
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Modal, TouchableWithoutFeedback, Keyboard, Image, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,33 +33,32 @@ const App = () => {
     })();
   }, []);
 
-  // useEffect hook to fetch the user ID from AsyncStorage on component mount.
-  useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const userData = await AsyncStorage.getItem("userData");
-        if (userData) {
-          const parsedData = JSON.parse(userData);
-          console.log("Fetched User ID:", parsedData.id); // Log the user ID
-          setUserId(parsedData.id); // Assuming user ID is stored as "id"
-        } else {
-          console.log("No user data found in AsyncStorage.");
-          // Handle the case where there's no user data.  Perhaps set userId to a default, or show an error.
-          // setUserId("default_user_id"); // Example default
-          //Or show an error to the user.
-          //Alert.alert("Error", "Please log in to submit a report.");
-        }
-      } catch (error) {
-        console.error("Error fetching user ID:", error);
-        Alert.alert("Error", "Failed to retrieve user data. Please check your connection."); // Inform user
-      }
-    };
-
-    getUserId();
-  }, []);
+    // useEffect hook to fetch the user ID from AsyncStorage on component mount.
+    useEffect(() => {
+        const getUserId = async () => {
+            try {
+                const storedUserId = await AsyncStorage.getItem("userId");
+                if (storedUserId) {
+                    setUserId(storedUserId);
+                    console.log("User ID from AsyncStorage:", storedUserId);
+                } else {
+                    console.log("userId not found in AsyncStorage");
+                    Alert.alert("Error", "Please log in to submit a report.");
+                }
+            } catch (error) {
+                console.error("Failed to fetch userId from AsyncStorage", error);
+                Alert.alert("Error", "Failed to retrieve user data. Please check your connection.");
+            }
+        };
+        getUserId();
+    }, []);
 
   // Function to submit the report to the server.
   const submitReport = async () => {
+    if (!userId) {
+        Alert.alert("Error", "User ID is missing. Please log in again.");
+        return;
+    }
     try {
       const formData = new FormData();
       formData.append('userId', userId);
@@ -183,12 +180,6 @@ const App = () => {
       {/* Report Title */}
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{reportTitle}</Text>
-        <TextInput
-          style={[styles.invisibleInput, !userId && styles.errorInput]}
-          value={userId}
-          editable={false} // Make it non-editable
-        />
-        {!userId && <Text style={styles.errorText}>User ID not loaded</Text>}
       </View>
 
       {/* Map Container */}
