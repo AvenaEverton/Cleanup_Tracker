@@ -19,7 +19,7 @@ const AdminUsers = () => {
     setError(null);
     try {
       console.log('Fetching users with filter:', filter);
-      const response = await axios.get(`http://192.168.1.17:5000/api/admin/users?filter=${filter}`);
+      const response = await axios.get(`http://192.168.1.22:5000/api/admin/users?filter=${filter}`);
       console.log('API Response:', response.data);
 
       if (response.data) {
@@ -47,7 +47,7 @@ const AdminUsers = () => {
 
   const handleStatusUpdate = async (userId, newStatus) => {
     try {
-      await axios.post(`http://192.168.1.17:5000/api/admin/users/${userId}/status`, { status: newStatus });
+      await axios.post(`http://192.168.1.22:5000/api/admin/users/${userId}/status`, { status: newStatus });
       fetchUsersData();
     } catch (error) {
       console.error('Error updating user status:', error);

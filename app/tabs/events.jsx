@@ -78,7 +78,7 @@ const App = () => {
         });
       });
 
-      const response = await axios.post('http://192.168.1.17:5000/api/reports', formData, {
+      const response = await axios.post('http://192.168.1.22:5000/api/reports', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

@@ -15,7 +15,7 @@ const AdminHome = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch("http://192.168.1.17:5000/api/admin/dashboard");
+      const response = await fetch("http://192.168.1.22:5000/api/admin/dashboard");
       const data = await response.json();
       setDashboardData(data);
     } catch (error) {

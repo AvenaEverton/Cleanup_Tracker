@@ -8,7 +8,7 @@ import io from "socket.io-client";
 const { width, height } = Dimensions.get("window");
 
 const isTablet = width > 600;
-const socket = io("http://192.168.1.17:5000")
+const socket = io("http://192.168.1.22:5000")
 
 const logo = require("../assets/images/naslively.png");
 const videoSource = require("../assets/images/bg_waste_02.mp4"); // Replace with your video file
