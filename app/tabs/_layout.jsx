@@ -21,9 +21,10 @@ export default function TabsLayout() {
           name="home"
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" size={size} color={color} />
-            ),
+            tabBarIcon: ({ focused, color, size }) => {
+              const iconName = focused ? "home" : "home-outline"; // Use filled icon if focused
+              return <Ionicons name={iconName} size={size} color={color} />;
+            },
           }}
         />
 
@@ -32,9 +33,10 @@ export default function TabsLayout() {
           name="events"
           options={{
             title: "Report",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="document-text-outline" size={size} color={color} />
-            )
+            tabBarIcon: ({ focused, color, size }) => {
+              const iconName = focused ? "document-text" : "document-text-outline";
+              return <Ionicons name={iconName} size={size} color={color} />;
+            }
           }}
         />
 
@@ -43,9 +45,10 @@ export default function TabsLayout() {
           name="notifications"
           options={{
             title: "Notifications",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="notifications-outline" size={size} color={color} />
-            ),
+            tabBarIcon: ({ focused, color, size }) => {
+              const iconName = focused ? "notifications" : "notifications-outline";
+              return <Ionicons name={iconName} size={size} color={color} />;
+            },
           }}
         />
 
@@ -54,9 +57,10 @@ export default function TabsLayout() {
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-outline" size={size} color={color} />
-            ),
+            tabBarIcon: ({ focused, color, size }) => {
+              const iconName = focused ? "person" : "person-outline";
+              return <Ionicons name={iconName} size={size} color={color} />;
+            },
           }}
         />
       </Tabs>

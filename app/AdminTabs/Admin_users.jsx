@@ -19,7 +19,7 @@ const AdminUsers = () => {
     setError(null);
     try {
       console.log('Fetching users with filter:', filter);
-      const response = await axios.get(`http://192.168.1.17:5000/api/admin/users?filter=${filter}`);
+      const response = await axios.get(`https://backend-rt98.onrender.com/api/admin/users?filter=${filter}`);
       console.log('API Response:', response.data);
 
       if (response.data) {
@@ -47,7 +47,7 @@ const AdminUsers = () => {
 
   const handleStatusUpdate = async (userId, newStatus) => {
     try {
-      await axios.post(`http://192.168.1.17:5000/api/admin/users/${userId}/status`, { status: newStatus });
+      await axios.post(`https://backend-rt98.onrender.com/api/admin/users/${userId}/status`, { status: newStatus });
       fetchUsersData();
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -79,7 +79,7 @@ const AdminUsers = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading users...</Text>
+        <Text style={styles.loadingText}>Fetching Users...</Text>
       </View>
     );
   }
@@ -94,54 +94,72 @@ const AdminUsers = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Hello Admin! "Username"</Text>
-        <TouchableOpacity style={styles.profileIcon}>
-          <Ionicons name="person-circle-outline" size={32} color="black" />
-        </TouchableOpacity>
-      </View>
+      <View style={styles.controlPanel}>
+        <Text style={styles.panelTitle}>User Management</Text>
+        <View style={styles.summaryCards}>
+          <View style={[styles.summaryCard, styles.approvedCard]}>
+            <Text style={styles.summaryCount}>{approvedCount}</Text>
+            <Text style={styles.summaryLabel}>Approved</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.pendingCard]}>
+            <Text style={styles.summaryCount}>{pendingCount}</Text>
+            <Text style={styles.summaryLabel}>Pending</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.restrictedCard]}>
+            <Text style={styles.summaryCount}>{restrictedCount}</Text>
+            <Text style={styles.summaryLabel}>Restricted</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.totalCard]}>
+            <Text style={styles.summaryCount}>{totalUsers}</Text>
+            <Text style={styles.summaryLabel}>Total Users</Text>
+          </View>
+        </View>
 
-      <View style={styles.controlCenter}>
-        <Text style={styles.controlCenterTitle}>User Control Center</Text>
-        <View style={styles.filterBar}>
-          <Picker
-            selectedValue={filter}
-            style={{ height: 50, width: 150 }}
-            onValueChange={(itemValue) => setFilter(itemValue)}
-          >
-            <Picker.Item label="All" value="All" />
-            <Picker.Item label="Approved" value="Approved" />
-            <Picker.Item label="Pending" value="Pending" />
-            <Picker.Item label="Restricted" value="Restricted" />
-          </Picker>
-          <Text style={styles.sortText}>Sort by: Date</Text>
+        <View style={styles.filterAndSort}>
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>Filter:</Text>
+            <View style={styles.filterDisplay}>
+              <Text style={styles.filterValue}>{filter}</Text>
+            </View>
+            <Picker
+              selectedValue={filter}
+              style={styles.filterPicker}
+              onValueChange={(itemValue) => setFilter(itemValue)}
+            >
+              <Picker.Item label="All" value="All" />
+              <Picker.Item label="Approved" value="Approved" />
+              <Picker.Item label="Pending" value="Pending" />
+              <Picker.Item label="Restricted" value="Restricted" />
+            </Picker>
+          </View>
+          {/* <Text style={styles.sortText}>Sort by: Date</Text> */}
         </View>
 
         <ScrollView style={styles.userList}>
           {users.map((user) => (
-            <View key={user.user_id} style={styles.userItem}>
+            <View key={user.user_id} style={[styles.userListItem, styles[`userItem_${user.status.toLowerCase()}`]]}>
+              <View style={styles.statusIndicator} />
               <View style={styles.userIcon}>
-                <Ionicons name="people-outline" size={24} color="black" />
+                <Ionicons name="person-outline" size={20} color="#fff" />
               </View>
               <Text style={styles.username}>{user.username}</Text>
-              <Text style={styles.userStatus}>{user.status}</Text>
+              <View style={[
+                styles.statusBadge,
+                user.status === 'Approved' && styles.approvedBadge,
+                user.status === 'Pending' && styles.pendingBadge,
+                user.status === 'Restricted' && styles.restrictedBadge,
+              ]}>
+                <Text style={styles.statusText}>{user.status}</Text>
+              </View>
               <TouchableOpacity
-              style={styles.optionsIcon}
-              onPress={() => handleOptionsPress(user)}
-              disabled={user.status !== 'pending'} // Correct placement of the disabled prop
-            >
-              <Ionicons name="ellipsis-vertical-outline" size={24} color="black" />
-            </TouchableOpacity>
+                style={styles.optionsButton}
+                onPress={() => handleOptionsPress(user)}
+              >
+                <Ionicons name="ellipsis-vertical" size={20} color="#555" />
+              </TouchableOpacity>
             </View>
           ))}
         </ScrollView>
-
-        <View style={styles.summary}>
-          <Text style={styles.summaryText}>Approved accounts: {approvedCount}</Text>
-          <Text style={styles.summaryText}>Pending accounts: {pendingCount}</Text>
-          <Text style={styles.summaryText}>Restricted accounts: {restrictedCount}</Text>
-          <Text style={styles.totalUsersText}>Total users: {totalUsers}</Text>
-        </View>
       </View>
     </View>
   );
@@ -150,82 +168,183 @@ const AdminUsers = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f4f6f8',
+    paddingHorizontal: 15,
+    paddingTop: 20,
+  },
+  controlPanel: {
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  headerText: {
+  panelTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
   },
-  profileIcon: {
-    padding: 5,
+  summaryCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+    flexWrap: 'wrap', // Added for better responsiveness
   },
-  controlCenter: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
+  summaryCard: {
+    backgroundColor: '#e9ecef',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+    minWidth: 100, // Increased minWidth for label visibility
+    marginBottom: 10, // Added marginBottom for spacing in wrapped layout
   },
-  controlCenterTitle: {
+  approvedCard: {
+    backgroundColor: '#d1e7dd',
+  },
+  pendingCard: {
+    backgroundColor: '#fff3cd',
+  },
+  restrictedCard: {
+    backgroundColor: '#f8d7da',
+  },
+  totalCard: {
+    backgroundColor: '#cfe2ff',
+  },
+  summaryCount: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#333',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  filterBar: {
+  summaryLabel: {
+    fontSize: 12,
+    color: '#555',
+    textAlign: 'center',
+    flexWrap: 'wrap',
+  },
+  filterAndSort: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
     alignItems: 'center',
+    marginBottom: 15,
   },
-  filterText: {
-    fontSize: 14,
-  },
-  sortText: {
-    fontSize: 14,
-  },
-  userList: {
-    maxHeight: 300,
-  },
-  userItem: {
+  filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+  },
+  filterLabel: {
+    fontSize: 16,
+    color: '#333',
+    marginRight: 10,
+  },
+  filterDisplay: {
+    backgroundColor: '#e9ecef',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 10,
+  },
+  filterValue: {
+    fontSize: 16,
+    color: '#333',
+  },
+  filterPicker: {
+    height: 40,
+    width: 150,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 6,
+    backgroundColor: 'white',
+  },
+  sortText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  userList: {
+    maxHeight: 350,
+  },
+  userListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  statusIndicator: {
+    width: 5,
+    height: '100%',
+    borderRadius: 2.5,
+    marginRight: 10,
+  },
+  userItem_approved: {
+    borderColor: '#28a745',
+    borderLeftWidth: 5,
+  },
+  userItem_pending: {
+    borderColor: '#ffc107',
+    borderLeftWidth: 5,
+  },
+  userItem_restricted: {
+    borderColor: '#dc3545',
+    borderLeftWidth: 5,
   },
   userIcon: {
-    backgroundColor: '#e0e0e0',
-    borderRadius: 20,
+    backgroundColor: '#6c757d',
+    borderRadius: 15,
     padding: 8,
     marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   username: {
     flex: 1,
     fontSize: 16,
+    color: '#333',
   },
-  optionsIcon: {
-    padding: 5,
+  statusBadge: {
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginLeft: 10,
   },
-  summary: {
-    marginTop: 15,
-  },
-  summaryText: {
-    fontSize: 14,
-  },
-  totalUsersText: {
-    fontSize: 16,
+  statusText: {
+    fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 5,
+    color: 'white',
+  },
+  approvedBadge: {
+    backgroundColor: '#28a745',
+  },
+  pendingBadge: {
+    backgroundColor: '#ffc107',
+  },
+  restrictedBadge: {
+    backgroundColor: '#dc3545',
+  },
+  optionsButton: {
+    padding: 8,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#555',
   },
   errorContainer: {
     flex: 1,
@@ -234,11 +353,8 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: 'red',
+    fontSize: 16,
   },
-  userStatus: {
-    fontSize: 14,
-    marginHorizontal: 10,
-  }
 });
 
 export default AdminUsers;

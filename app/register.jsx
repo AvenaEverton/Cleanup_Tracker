@@ -1,273 +1,281 @@
 import React, { useState } from "react";
-import { 
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image,
+import {
+    View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, KeyboardAvoidingView, Platform
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from '@expo/vector-icons';
+
+// Ensure the path to your image is correct
+import appLogo from '../assets/images/NasLogo.png';
 
 const RegisterScreen = () => {
-  const navigation = useNavigation();
-  const [fullName, setFullName] = useState("");
-  const [userName, setUserName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState("Local User");
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [idPhoto, setIdPhoto] = useState(null);
+    const navigation = useNavigation();
+    const [fullName, setFullName] = useState("");
+    const [userName, setUserName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [idPhoto, setIdPhoto] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const playSound = async () => {
-    const { sound } = await Audio.Sound.createAsync(
-      require("../assets/sound/click.mp3")
-    );
-    await sound.playAsync();
-  };
+    const playSound = async () => {
+        const { sound } = await Audio.Sound.createAsync(
+            require("../assets/sound/click.mp3")
+        );
+        await sound.playAsync();
+    };
 
-  const handleRegister = async () => {
-    if (!fullName || !userName || !email || !password || !confirmPassword) {
-      Alert.alert("Error", "All fields are required!");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
-      return;
-    }
-  
-    await playSound();
-  
-    try {
-      const response = await fetch("http://192.168.1.17:5000/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName,
-          username: userName,   // Make sure it matches the backend field
-          email,
-          password,
-          userType,
-          idImagePath: idPhoto, // Store the ID image path in the database
-        }),
-      });
-  
-      const data = await response.json();
-  
-      if (response.ok) {
-        Alert.alert("Success", data.message);
-        navigation.navigate("LoginScreen");
-      } else {
-        Alert.alert("Registration Failed", data.message);
-      }
-    } catch (error) {
-      Alert.alert("Error", "Something went wrong. Try again.");
-    }
-  };
-  
-    
+    const handleRegister = async () => {
+        if (!fullName || !userName || !email || !password || !confirmPassword) {
+            Alert.alert("Error", "All fields are required!");
+            return;
+        }
+        if (password !== confirmPassword) {
+            Alert.alert("Error", "Passwords do not match!");
+            return;
+        }
 
-  const handleBack = async () => {
-    await playSound();
-    navigation.navigate('intro', { slideIndex: 3 });
-  };
+        await playSound();
 
-  const handleCheckbox = () => {
-    if (!isAuthorized) {
-      Alert.alert(
-        "Confirmation",
-        "Are you sure you want to become Authorized Personnel?",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => setIsAuthorized(false)
-          },
-          {
-            text: "Yes",
-            onPress: () => {
-              setIsAuthorized(true);
-              setUserType("Authorized Personnel");
+        try {
+            const API_BASE_URL = "https://backend-rt98.onrender.com";
+            const response = await fetch(`${API_BASE_URL}/api/register`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    fullName,
+                    username: userName,
+                    email,
+                    password,
+                    idImagePath: idPhoto,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                Alert.alert("Success", data.message);
+                await AsyncStorage.setItem('hasRegistered', 'true');
+                navigation.navigate("LoginScreen");
+            } else {
+                Alert.alert("Registration Failed", data.message);
             }
-          }
-        ]
-      );
-    } else {
-      setIsAuthorized(false);
-      setUserType("Local User");
-      setIdPhoto(null);
-    }
-  };
+        } catch (error) {
+            Alert.alert("Error", "Something went wrong. Try again.");
+        }
+    };
 
-  const handleTakePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    const handleBack = async () => {
+        await playSound();
+        navigation.navigate('intro', { slideIndex: 3 });
+    };
 
-    if (!result.canceled) {
-      setIdPhoto(result.assets[0].uri);
-    }
-  };
+    const handleTakePhoto = async () => {
+        let result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 1,
+        });
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Register Here</Text>
-     
-      <TextInput
-        style={styles.input}
-        placeholder="Full Name"
-        value={fullName}
-        onChangeText={(text) => setFullName(text)}
-      />
+        if (!result.canceled) {
+            setIdPhoto(result.assets[0].uri);
+        }
+    };
 
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={userName}
-        onChangeText={(text) => setUserName(text)}
-      />
+    return (
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.keyboardAvoidingContainer}
+        >
+            <View style={styles.container}>
+                <View style={styles.logoContainer}>
+                    <Image source={appLogo} style={styles.logoImage} resizeMode="contain" />
+                    <Text style={styles.logoText}>Register</Text>
+                </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="E-mail"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={(text) => setEmail(text)}
-      />
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Full Name"
+                        value={fullName}
+                        onChangeText={(text) => setFullName(text)}
+                    />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={(text) => setPassword(text)}
-      />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Username"
+                        value={userName}
+                        onChangeText={(text) => setUserName(text)}
+                    />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm Password"
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={(text) => setConfirmPassword(text)}
-      />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="E-mail"
+                        keyboardType="email-address"
+                        value={email}
+                        onChangeText={(text) => setEmail(text)}
+                    />
 
-      <View style={styles.checkboxContainer}>
-        <TouchableOpacity onPress={handleCheckbox}>
-          <Text style={styles.checkboxText}>
-            {isAuthorized ? "✅ Authorized Personnel" : "⬜ Authorized Personnel"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={styles.passwordInput}
+                            placeholder="Password"
+                            secureTextEntry={!showPassword}
+                            value={password}
+                            onChangeText={(text) => setPassword(text)}
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(!showPassword)}
+                        >
+                            <Ionicons
+                                name={showPassword ? "eye-outline" : "eye-off-outline"}
+                                size={24}
+                                color="gray"
+                            />
+                        </TouchableOpacity>
+                    </View>
 
-      {isAuthorized && (
-        <TouchableOpacity style={styles.photoButton} onPress={handleTakePhoto}>
-          <Text style={styles.photoButtonText}>Take ID Photo</Text>
-        </TouchableOpacity>
-      )}
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={styles.passwordInput}
+                            placeholder="Confirm Password"
+                            secureTextEntry={!showConfirmPassword}
+                            value={confirmPassword}
+                            onChangeText={(text) => setConfirmPassword(text)}
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                            <Ionicons
+                                name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
+                                size={24}
+                                color="gray"
+                            />
+                        </TouchableOpacity>
+                    </View>
 
-      {idPhoto && (
-        <Image source={{ uri: idPhoto }} style={styles.image} />
-      )}
+                    <TouchableOpacity style={styles.button} onPress={handleTakePhoto}>
+                        <Text style={styles.buttonText}>Take ID Photo</Text>
+                    </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Submit</Text>
-      </TouchableOpacity>
 
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>Back</Text>
-      </TouchableOpacity>
-    </View>
-  );
+                    {idPhoto && (
+                        <Image source={{ uri: idPhoto }} style={styles.image} />
+                    )}
+
+                    <TouchableOpacity style={styles.button} onPress={handleRegister}>
+                        <Text style={styles.buttonText}>Submit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </KeyboardAvoidingView>
+    );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  userTypeLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  input: {
-    width: "100%",
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    width: "100%",
-    marginBottom: 15,
-  },
-  checkboxText: {
-    fontSize: 16,
-    color: "#555",
-  },
-  button: {
-    backgroundColor: "#008000",
-    width: "100%",
-    height: 50,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 18,
-  },
-  backButton: {
-    width: "100%",
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#008000",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  backButtonText: {
-    color: "#008000",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  photoButton: {
-    backgroundColor: "#FFA500",
-    width: "100%",
-    height: 50,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  photoButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 18,
-  },
-  image: {
-    width: 150,
-    height: 150,
-    borderRadius: 10,
-    marginBottom: 20,
-  }
+    keyboardAvoidingContainer: {
+        flex: 1,
+    },
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#f0f0f0",
+        paddingHorizontal: 30,
+    },
+    logoContainer: {
+        alignItems: "center",
+        marginBottom: 30,
+    },
+    logoImage: {
+        width: 80,
+        height: 80,
+        marginBottom: 10,
+    },
+    logoText: {
+        fontSize: 28,
+        fontWeight: "bold",
+        color: "#008000",
+        marginTop: 0,
+    },
+    inputContainer: {
+        width: "100%",
+        maxWidth: 350,
+    },
+    input: {
+        backgroundColor: "#fff",
+        padding: 15,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: "#ddd",
+        fontSize: 16,
+        color: "#333",
+    },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        marginBottom: 15,
+    },
+    passwordInput: {
+        flex: 1,
+        height: '100%',
+        padding: 15,
+        fontSize: 16,
+        color: '#333',
+    },
+    eyeIcon: {
+        padding: 15,
+    },
+    button: {
+        backgroundColor: "#008000",
+        padding: 15,
+        borderRadius: 8,
+        alignItems: "center",
+        marginTop: 10,
+        elevation: 3,
+    },
+    buttonText: {
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: 18,
+    },
+    backButton: {
+        backgroundColor: "transparent",
+        padding: 15,
+        alignItems: "center",
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "#008000",
+        marginTop: 15,
+    },
+    backButtonText: {
+        color: "#008000",
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+    image: {
+        width: 150,
+        height: 150,
+        borderRadius: 8,
+        marginBottom: 20,
+    },
 });
 
 export default RegisterScreen;
