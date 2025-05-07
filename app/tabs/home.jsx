@@ -436,7 +436,45 @@ export default function HomeScreen() {
                 </View>
             </View>
 
+            <Tooltip
+    isVisible={recentEventTooltipVisible}
+    content={
+        <View style={styles.tooltipContent}>
+            <Text style={styles.tooltipTitle}>Recent Events</Text>
+            <Text style={styles.tooltipDescription}>
+                Check out the most recent events happening around you.
+            </Text>
+        </View>
+    }
+    onClose={() => setRecentEventTooltipVisible(false)}
+>
+    <View style={[styles.recentEvent, darkMode ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : { backgroundColor: '#fff' }]} ref={recentEventRef}>
+        <Text style={[styles.recentEventText, darkMode ? styles.darkText : styles.lightText]}>
+            Recent Events
+        </Text>
+        {loading ? (
+            <ActivityIndicator size="small" color="#4CAF50" style={styles.loadingIndicator} />
+        ) : events && events.length > 0 ? (
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.eventsScrollContainer}
+            >
+          {events.map((event, index) => (
+  <EventCard key={event.id ?? `${event.title}-${event.date}-${index}`} event={event} />
+))}
 
+            </ScrollView>
+        ) : (
+            <View style={styles.noEventsContainer}>
+                <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
+                <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
+                    No events available
+                </Text>
+            </View>
+        )}
+    </View>
+</Tooltip>
 
             <Tooltip
                 isVisible={joinCleanUpTooltipVisible}
