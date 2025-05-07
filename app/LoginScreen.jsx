@@ -29,7 +29,7 @@ const LoginScreen = () => {
         }
 
         try {
-            const response = await axios.post("https://backend-rt98.onrender.com/api/login", {
+            const response = await axios.post("http://192.168.1.23:5000/api/login", {
                 emailOrUsername: email,
                 password,
             });

@@ -7,7 +7,7 @@ import { Audio } from 'expo-av'; // Import the Audio module
 
 const { width, height } = Dimensions.get("window");
 const isTablet = width > 600;
-const socket = io("https://backend-rt98.onrender.com")
+const socket = io("http://192.168.1.23:5000")
 
 
 export default function IndexScreen() {

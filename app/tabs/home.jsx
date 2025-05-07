@@ -68,7 +68,7 @@ export default function HomeScreen() {
     const fetchEvents = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await axios.get("https://backend-rt98.onrender.com/events");
+            const response = await axios.get("http://192.168.1.23:5000/events");
             if (response.data && Array.isArray(response.data.events)) {
                 const sortedEvents = response.data.events.sort((a, b) => {
                     return new Date(b.date) - new Date(a.date);

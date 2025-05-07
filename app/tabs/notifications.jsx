@@ -11,7 +11,7 @@ import { Audio } from 'expo-av';
 
 const NOTIFICATIONS_VIEWED_KEY = "notificationsViewed";
 const EVENT_ENDED_THRESHOLD_HOURS = 24;
-const API_BASE_URL = "https://backend-rt98.onrender.com";
+const API_BASE_URL = "http://192.168.1.23:5000";
 
 const backgroundImage = require('../../assets/images/reportbg.jpg');
 

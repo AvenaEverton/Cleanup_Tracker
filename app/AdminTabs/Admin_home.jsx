@@ -92,7 +92,7 @@ const AdminHome = () => {
 
     const fetchDashboardData = async () => {
         try {
-            const response = await fetch("https://backend-rt98.onrender.com/api/admin/dashboard");
+            const response = await fetch("http://192.168.1.23:5000/api/admin/dashboard");
             const data = await response.json();
             setDashboardData({ ...dashboardData, ...data });
         } catch (error) {
@@ -104,7 +104,7 @@ const AdminHome = () => {
 
     const fetchParticipantsData = async () => {
         try {
-            const response = await fetch("https://backend-rt98.onrender.com/api/admin/participants-per-event");
+            const response = await fetch("http://192.168.1.23:5000/api/admin/participants-per-event");
             const data = await response.json();
             console.log("Participants data from backend:", data); // Log the data
             setParticipantsPerEventData(data);
@@ -115,7 +115,7 @@ const AdminHome = () => {
 
     const fetchReportsData = async () => {
         try {
-            const response = await fetch("https://backend-rt98.onrender.com/api/admin/report-details"); // Changed URL
+            const response = await fetch("http://192.168.1.23:5000/api/admin/report-details"); // Changed URL
             const data = await response.json();
             console.log("Reports data from backend:", data);
             setReportsData(data);
@@ -126,7 +126,7 @@ const AdminHome = () => {
 
     const fetchRecentEvents = async () => {
         try {
-            const response = await fetch("https://backend-rt98.onrender.com/api/admin/recent-events");
+            const response = await fetch("http://192.168.1.23:5000/api/admin/recent-events");
             const data = await response.json();
             console.log("Recent events data:", data);
             setRecentEventsData(data);
@@ -410,7 +410,7 @@ const AdminHome = () => {
                                                 <Image
                                                     key={idx}
                                                     source={{
-                                                        uri: `https://backend-rt98.onrender.com/uploads/${imgFilename}`
+                                                        uri: `http://192.168.1.23:5000/uploads/${imgFilename}`
                                                     }}
                                                     style={styles.reportImage}
                                                 />

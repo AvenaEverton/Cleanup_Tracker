@@ -121,7 +121,7 @@ const App = () => {
         });
       });
 
-      const response = await axios.post('https://backend-rt98.onrender.com/api/reports', formData, {
+      const response = await axios.post('http://192.168.1.23:5000/api/reports', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

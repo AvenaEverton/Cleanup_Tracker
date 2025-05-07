@@ -42,7 +42,7 @@ const RegisterScreen = () => {
         await playSound();
 
         try {
-            const API_BASE_URL = "https://backend-rt98.onrender.com";
+            const API_BASE_URL = "http://192.168.1.23:5000";
             const response = await fetch(`${API_BASE_URL}/api/register`, {
                 method: "POST",
                 headers: {
