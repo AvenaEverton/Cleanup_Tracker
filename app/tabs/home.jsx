@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
 import {
     View, Text, TextInput, TouchableOpacity, Image, Animated,
-    Easing, StyleSheet, Linking, ScrollView
+    Easing, StyleSheet, Linking, ScrollView, ActivityIndicator, Alert
 } from "react-native";
 import { ThemeContext } from "../../context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,18 +16,34 @@ const ORANGE = '#FFA500';
 
 const EventCard = ({ event }) => {
     const router = useRouter();
+
+    // Construct the full image URL if it exists
+    const imageSource = event.imageUrl
+        ? { uri: event.imageUrl }
+        : require('../../assets/images/NasAppIcon.png');
+
     return (
         <TouchableOpacity
             style={styles.eventCard}
-            onPress={() => router.push({ pathname: '/event', params: { event: JSON.stringify(event) } })}
+            onPress={() => router.push({
+                pathname: '/event',
+                params: { event: JSON.stringify(event) }
+            })}
         >
-            {event.imageUrl && (
-                <Image source={{ uri: event.imageUrl }} style={styles.eventImage} />
-            )}
+            <Image
+                source={imageSource}
+                style={styles.eventImage}
+                resizeMode="cover"
+            />
             <View style={styles.eventInfo}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventDate}>{event.date}</Text>
-                <Text style={styles.eventLocation}>{event.location}</Text>
+                <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                <Text style={styles.eventDate}>{event.formattedDate || event.date}</Text>
+                <Text style={styles.eventLocation} numberOfLines={1}>
+                    <Ionicons name="location-outline" size={12} /> {event.location}
+                </Text>
+                <Text style={styles.eventParticipants}>
+                    <Ionicons name="people-outline" size={12} /> {event.participants || 0} joining
+                </Text>
             </View>
         </TouchableOpacity>
     );
@@ -64,27 +80,66 @@ export default function HomeScreen() {
     // New state and ref for the floating tip
     const [showFloatingTip, setShowFloatingTip] = useState(true); // Control visibility
     const floatingTipRef = useRef(null);
-
-    const fetchEvents = useCallback(async () => {
+    const fetchRecentEvents = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await axios.get("https://backend-rt98.onrender.com/events");
-            if (response.data && Array.isArray(response.data.events)) {
-                const sortedEvents = response.data.events.sort((a, b) => {
-                    return new Date(b.date) - new Date(a.date);
+            const response = await axios.get("https://backend-rt98.onrender.com/api/events");
+            if (response.data) {
+                // Filter recent events (e.g., events from the last 30 days)
+                const recentEvents = response.data.filter(event => {
+                    const eventDate = new Date(event.date);
+                    const today = new Date();
+                    const diffTime = today - eventDate;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    return diffDays <= 30; // Last 30 days
                 });
-                setEvents(sortedEvents);
-            } else {
-                console.warn("Events endpoint returned invalid data:", response.data);
-                setEvents([]);
+
+                // Ensure image URLs are correct
+                const eventsWithImages = recentEvents.map(event => ({
+                    ...event,
+                    imageUrl: event.image_url
+                        ? `https://backend-rt98.onrender.com/uploads/${event.image_url}`
+                        : null
+                }));
+                setEvents(eventsWithImages);
             }
         } catch (error) {
             console.error("Failed to fetch events:", error);
-            setEvents([]);
+            Alert.alert("Error", "Could not load events. Please try again later.");
+            setEvents([]); // Avoid crashes in UI
         } finally {
             setLoading(false);
         }
     }, []);
+
+    const testEndpoint = async () => {
+        try {
+            const testUrl = "https://backend-rt98.onrender.com/api/events";
+            console.log("Testing endpoint:", testUrl);
+
+            const response = await fetch(testUrl);
+            console.log("Response status:", response.status);
+
+            const data = await response.json();
+            console.log("Response data:", data);
+
+            Alert.alert(
+                "Endpoint Test",
+                `Status: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`,
+                [{ text: "OK" }]
+            );
+        } catch (error) {
+            console.error("Test failed:", error);
+            Alert.alert(
+                "Test Failed",
+                error.message,
+                [{ text: "OK" }]
+            );
+        }
+    };
+
+    // Call it somewhere, like in a useEffect or button press
+
 
     useEffect(() => {
         const checkNewUser = async () => {
@@ -97,7 +152,6 @@ export default function HomeScreen() {
                     setSearchTooltipVisible(true);
                     setShowFloatingTip(true); // Show the floating tip
                     await AsyncStorage.setItem('isNewUser', 'false'); // Prevent showing again
-                    await AsyncStorage.setItem('hasRegistered', 'false'); // Reset flag
                 } else {
                     setShowFloatingTip(false); // Hide the floating tip
                 }
@@ -137,9 +191,13 @@ export default function HomeScreen() {
             }
         };
 
-        getUsernameAndEvents();
-        fetchEvents();
-        checkNewUser(); // Check for new/registered user status
+        const initializeApp = async () => {
+            await getUsernameAndEvents();
+            await fetchRecentEvents(); // Changed from fetchEvents to fetchRecentEvents
+            await checkNewUser();
+        };
+
+        initializeApp();
 
         Animated.loop(
             Animated.sequence([
@@ -175,12 +233,12 @@ export default function HomeScreen() {
             ])
         ).start();
 
-    }, [waveAnim, arrowAnim, fetchEvents]);
+    }, [waveAnim, arrowAnim, fetchRecentEvents]); // Changed dependency from fetchEvents to fetchRecentEvents
 
     useFocusEffect(
         useCallback(() => {
-            fetchEvents();
-        }, [fetchEvents])
+            fetchRecentEvents(); // Changed from fetchEvents to fetchRecentEvents
+        }, [fetchRecentEvents]) // Changed dependency
     );
 
     const handleNewEvent = useCallback((newEvent) => {
@@ -212,7 +270,7 @@ export default function HomeScreen() {
                 onPress={startWalkthrough} // Call function to start walkthrough
                 ref={floatingTipRef} // Ref for the floating tip
             >
-                <Ionicons name="hand-point-up" size={30} color="#fff" />
+                <Ionicons name="information-circle-outline" size={40} color="#fff" />
             </TouchableOpacity>
 
             <Tooltip
@@ -371,7 +429,6 @@ export default function HomeScreen() {
                     </Tooltip>
                 </View>
             </View>
-
             <Tooltip
                 isVisible={recentEventTooltipVisible}
                 content={
@@ -382,29 +439,46 @@ export default function HomeScreen() {
                         </Text>
                     </View>
                 }
-                placement="bottom"
-                onClose={() => {
-                    setRecentEventTooltipVisible(false);
-                    setJoinCleanUpTooltipVisible(true);
-                }}
-                useReactNativeModal={true}
-                childWrapperStyle={styles.tooltipWrapper}
-                containerStyle={styles.tooltipContainer}
+                onClose={() => setRecentEventTooltipVisible(false)}
             >
-                <View style={[styles.recentEvent, darkMode ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : { backgroundColor: '#fff' }]} ref={recentEventRef}>
-                    <Text style={[styles.recentEventText, darkMode ? styles.darkText : styles.lightText]}>Recent Event</Text>
+                <View style={[styles.recentEvent, darkMode ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : { backgroundColor: '#fff' }]}>
+                    <Text style={[styles.recentEventText, darkMode ? styles.darkText : styles.lightText]}>
+                        Recent Events
+                        <TouchableOpacity
+                            onPress={testEndpoint}
+                            style={{ marginLeft: 10 }}
+                        >
+                            <Ionicons name="bug-outline" size={16} color={darkMode ? "#FF5252" : "#F44336"} />
+                        </TouchableOpacity>
+                    </Text>
+
                     {loading ? (
-                        <Text>Loading events...</Text>
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color="#4CAF50" />
+                        </View>
                     ) : events.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                            <View style={{ flexDirection: 'row' }}>
-                                {events.map((event) => (
-                                    <EventCard key={event.id} event={event} />
-                                ))}
-                            </View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingRight: 20 }}
+                        >
+                            {events.map((event) => (
+                                <EventCard key={event.id} event={event} />
+                            ))}
                         </ScrollView>
                     ) : (
-                        <Text>No events available yet.</Text>
+                        <View style={styles.noEventsContainer}>
+                            <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
+                            <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
+                                No events available
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.retryButton}
+                                onPress={fetchRecentEvents}
+                            >
+                                <Text style={styles.retryText}>Try Again</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
             </Tooltip>
@@ -519,7 +593,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 0,
         left: 5,
-        right: 5,
+        right: 50,
         marginTop: -30,
         elevation: 10,
         zIndex: 10,
@@ -562,13 +636,13 @@ const styles = StyleSheet.create({
     recentEvent: {
         backgroundColor: "#fff",
         borderRadius: 10,
-        padding: 20,
-        marginTop: 20,
-        marginBottom: 35,
+        padding: 7,
+        marginTop: 10,
+        marginBottom: 30,
         borderWidth: 1,
         borderColor: "#008000",
         height: 'auto',
-        minHeight: 180,
+        minHeight: 160, // Adjusted height to be a little smaller
         justifyContent: "flex-start",
     },
     recentEventText: {
@@ -582,6 +656,7 @@ const styles = StyleSheet.create({
         height: 200,
         justifyContent: "space-between",
         marginTop: -20,
+        marginBottom: 20, // Added margin bottom
     },
     cleanUpText: {
         fontSize: 24,
@@ -598,7 +673,7 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: "bold",
         color: "#FBFBFB",
-        textShadowColor: "rgba(0, 0, 0, 0.5)",
+        textShadowColor: "rgba(0, 0,0, 0.5)",
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 5,
     },
@@ -622,36 +697,50 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     eventCard: {
-        width: 200,
-        borderRadius: 10,
-        marginRight: 10,
+        width: 220,
+        borderRadius: 12,
+        marginRight: 15,
         backgroundColor: '#FFF',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+        overflow: 'hidden',
     },
     eventImage: {
         width: '100%',
-        height: 120,
+        height: 140,
         borderTopLeftRadius: 10,
         borderTopRightRadius: 10,
+        backgroundColor: '#f5f5f5', // Fallback background
+    },
+    eventImagePlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f0f0f0',
     },
     eventInfo: {
-        padding: 10,
+        padding: 12,
     },
     eventTitle: {
         fontSize: 16,
         fontWeight: 'bold',
+        marginBottom: 4,
     },
     eventDate: {
         fontSize: 12,
-        color: 'gray',
+        color: '#666',
+        marginBottom: 4,
     },
     eventLocation: {
         fontSize: 12,
-        color: 'green'
+        color: '#4CAF50',
+        marginBottom: 4,
+    },
+    eventParticipants: {
+        fontSize: 12,
+        color: '#666',
     },
     tooltipWrapper: {
         zIndex: 1000,
@@ -672,32 +761,55 @@ const styles = StyleSheet.create({
     tooltipTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: '#00000',
         marginBottom: 8,
     },
     tooltipDescription: {
         fontSize: 14,
-        color: '#000000',
+        color: '#00000',
         textAlign: 'center',
         lineHeight: 20,
     },
     // Floating tip icon styles
     floatingTip: {
         position: 'absolute',
-        top: 10, // Adjust vertical position as needed
-        right: 10,// Position on the right edge
-        backgroundColor: NEW_GREEN, // Use your theme color
-borderRadius: 30, // Make it round
-        width: 60,
-        height: 60,
+        top: 20,
+        right: 10,
+        borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 5, // Add shadow for better visibility
-        zIndex: 1000, // Ensure it's above other elements
+        elevation: 5,
+        zIndex: 1000,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 140, // Match your event card height
+    },
+    noEventsContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    noEventsText: {
+        marginTop: 10,
+        textAlign: 'center',
+        color: '#9E9E9E',
+    },
+    retryButton: {
+        marginTop: 15,
+        backgroundColor: NEW_GREEN,
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+        borderRadius: 5,
+    },
+    retryText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
 });
-

@@ -28,24 +28,43 @@ const AdminEvents = () => {
 
   const handleCreateEvent = async () => {
     try {
-      const response = await axios.post("https://backend-rt98.onrender.com/addEvent", {
-        eventName,
-        description,
-        date: date.toISOString().split("T")[0], //YYYY-MM-DD
-        time: time.toTimeString().split(" ")[0], // HH:MM:SS
-        location,
-        additionalDetails,
-      });
-
+      const formData = new FormData();
+      
+      // Add all text fields
+      formData.append('eventName', eventName);
+      formData.append('description', description);
+      formData.append('date', date.toISOString().split('T')[0]);
+      formData.append('time', time.toTimeString().split(' ')[0]);
+      formData.append('location', location);
+      formData.append('additionalDetails', additionalDetails);
+  
+      // Add the image file if one was selected
+      if (files.length > 0) {
+        formData.append('image', {
+          uri: files[0].uri,
+          name: files[0].name,
+          type: files[0].mimeType || 'image/jpeg',
+        });
+      }
+  
+      const response = await axios.post(
+        'https://backend-rt98.onrender.com/addEvent',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+  
       alert(response.data.message);
-      console.log("Event Created:", response.data);
+      console.log('Event Created:', response.data);
     } catch (error) {
       if (error.response) {
-        // console.error("Error creating event:", error.response.data);
         alert(`Failed to create event: ${error.response.data.message}`);
       } else {
-        console.error("Error creating event:", error);
-        alert("Failed to create event.");
+        console.error('Error creating event:', error);
+        alert('Failed to create event.');
       }
     }
   };

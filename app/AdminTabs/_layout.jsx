@@ -7,7 +7,7 @@ import AdminProfile from "../AdminTabs/Admin_profile";
 import AdminUsers from "../AdminTabs/Admin_users";
 import { Text, View, StyleSheet, TouchableOpacity } from 'react-native'; // Import TouchableOpacity
 import { FontAwesome5 } from '@expo/vector-icons'; // Import FontAwesome5
-
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 
@@ -17,11 +17,14 @@ const Header = ({ title, icon, navigation }) => {
             <Ionicons name={icon} size={24} color="white" style={styles.headerIcon} />
             <Text style={styles.headerTitle}>{title}</Text>
             {title === 'Home' && (
-                <TouchableOpacity style={styles.profileIconContainer} onPress={() => navigation.navigate('Profile')}>
-                    <View style={styles.profileCircle}>
-                        <FontAwesome5 name="user-shield" size={30} color="white" />
-                    </View>
-                </TouchableOpacity>
+                <View style={styles.profileAndLabelContainer}>
+                    <Text style={styles.adminLabel}>Admin</Text>
+                    <TouchableOpacity style={styles.profileIconContainer} onPress={() => navigation.navigate('Profile')}>
+                        <View style={styles.profileCircle}>
+                            <FontAwesome5 name="user-shield" size={24} color="white" />
+                        </View>
+                    </TouchableOpacity>
+                </View>
             )}
         </View>
     );
@@ -41,8 +44,17 @@ const AdminTabs = ({ navigation }) => {
 
                         return <Ionicons name={iconName} size={size} color={color} />;
                     },
-                    tabBarActiveTintColor: "#007bff",
-                    tabBarInactiveTintColor: "gray",
+                    tabBarActiveTintColor: "#FFFFFF", // Active tab color
+                    tabBarInactiveTintColor: "rgba(255,255,255,0.6)", // Inactive tab color
+                    tabBarStyle: {
+                        backgroundColor: '#008000', // Green background for the tab bar
+                        borderTopColor: 'transparent', // Remove top border
+                        height: 60, // Increased height of tab bar
+                    },
+                    tabBarLabelStyle: {
+                        fontSize: 12, // Increased font size of labels
+                        marginTop: 5,  // Add space between icon and label
+                    },
                     headerShown: false, // Hide the default header
                 })}
             >
@@ -52,6 +64,7 @@ const AdminTabs = ({ navigation }) => {
                     options={{
                         header: ({ navigation }) => <Header title="Home" icon="home" navigation={navigation} />,
                         headerShown: true, // Show the custom header for this screen
+                        tabBarLabel: 'Home', //Explicitly set tab bar label
                     }}
                 />
                 <Tab.Screen
@@ -60,6 +73,7 @@ const AdminTabs = ({ navigation }) => {
                     options={{
                         header: ({ navigation }) => <Header title="Events" icon="calendar" navigation={navigation} />,
                         headerShown: true,
+                        tabBarLabel: 'Events',
                     }}
                 />
                 <Tab.Screen
@@ -68,6 +82,7 @@ const AdminTabs = ({ navigation }) => {
                     options={{
                         header: ({ navigation }) => <Header title="Users" icon="people" navigation={navigation} />,
                         headerShown: true,
+                        tabBarLabel: 'Users',
                     }}
                 />
                 <Tab.Screen
@@ -76,6 +91,7 @@ const AdminTabs = ({ navigation }) => {
                     options={{
                         header: ({ navigation }) => <Header title="Profile" icon="person" navigation={navigation} />,
                         headerShown: true,
+                        tabBarLabel: 'Profile',
                     }}
                 />
             </Tab.Navigator>
@@ -86,37 +102,49 @@ const AdminTabs = ({ navigation }) => {
 const styles = StyleSheet.create({
     headerContainer: {
         backgroundColor: '#008000',
-        paddingVertical: 20,
+        paddingVertical: 15,
         paddingHorizontal: 15,
         alignItems: 'center',
         flexDirection: 'row',
         justifyContent: 'space-between',
+        height: 60,
     },
     headerTitle: {
         color: 'white',
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         marginLeft: 8,
         flex: 1,
+        textAlign: 'left',
     },
     headerIcon: {
-        marginRight: 5,
+        marginRight: 8,
         color: 'white',
-        size: 28,
+        size: 24,
     },
     profileIconContainer: {
         padding: 5,
     },
     profileCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: 'rgba(255,255,255,0.3)',
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
-        borderWidth: 2,  // Added border
-        borderColor: 'white', // Added border color
+        borderWidth: 2,
+        borderColor: 'white',
+    },
+    adminLabel: {
+        color: 'white',
+        fontSize: 25, // Increased font size
+        marginRight: 5, // Changed from marginLeft to marginRight
+        fontWeight: 'bold'
+    },
+    profileAndLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
 

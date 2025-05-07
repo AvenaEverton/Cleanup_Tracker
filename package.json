@@ -57,6 +57,7 @@
     "expo-video": "~2.0.6",
     "expo-web-browser": "~14.0.2",
     "express": "^4.21.2",
+    "framer-motion": "^12.9.7",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.507.0",

@@ -105,6 +105,7 @@ const studyLinks = [
       filipino_content: "General information, may contain data related to the Philippines in reports.",
     },
   ];
+
 export default function LearnScreen() {
   const router = useRouter();
   const [animation] = useState(new Animated.Value(1)); // Initialize animation value
@@ -119,6 +120,7 @@ export default function LearnScreen() {
       Animated.timing(animation, {
         toValue: 1,
         duration: 100,
+        useNativeDriver: true,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -168,9 +170,6 @@ export default function LearnScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="#fff" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Understanding Our Waste</Text>
         </View>
 
@@ -267,12 +266,13 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 12,
     marginBottom: 20,
+    justifyContent: 'center', // Centers the title
   },
   headerTitle: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: "bold",
-    marginLeft: 12,
+    marginLeft: 0, // Removed marginLeft
   },
   section: {
     backgroundColor: "#FFFFFF",
@@ -290,13 +290,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 12,
     color: "#333",
+    textAlign: 'center',
   },
   text: {
     fontSize: 16,
     color: "#555",
     marginBottom: 10,
-    lineHeight: 24, // Improved readability
-  },
+    lineHeight: 24,
+    textAlign: 'justify', // This will justify the general text
+   },
   introImage: {
     width: "100%",
     height: 150,
