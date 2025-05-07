@@ -39,7 +39,51 @@ const App = () => {
     const [submitTooltipVisible, setSubmitTooltipVisible] = useState(false);
     const tipIconRef = useRef(null); // Ref for the tip icon
     const [showTipIconTooltip, setShowTipIconTooltip] = useState(false);
+    const [address, setAddress] = useState('');
 
+
+
+
+    const fetchAddressFromCoords = async (coords) => {
+        try {
+            const response = await fetch(
+                `https://api.geoapify.com/v1/geocode/reverse?lat=${coords.latitude}&lon=${coords.longitude}&apiKey=e51fa78ef9e946cda57e3ca54876e825`
+            );
+            const data = await response.json();
+            console.log("📍 Geoapify response:", data); // Debug
+    
+            if (data && data.features && data.features.length > 0) {
+                const props = data.features[0].properties;
+    
+                const street = props.street; // No fallback
+                const barangay = props.suburb || props.quarter || 'Unknown Barangay';
+                const city = props.city || props.town || props.village || 'Unknown City';
+                const state = props.state || 'Unknown Region';
+                const postcode = props.postcode || '0000';
+                const country = props.country || 'Unknown Country';
+    
+                const addressParts = [
+                    street,      // Only included if truthy
+                    barangay,
+                    city,
+                    state,
+                    postcode,
+                    country
+                ].filter(Boolean); // Remove empty/undefined
+    
+                const fullAddress = addressParts.join(', ');
+                setAddress(fullAddress);
+            } else {
+                setAddress("Address not found");
+            }
+        } catch (error) {
+            console.error("Geoapify fetch error:", error);
+            setAddress("Failed to fetch address");
+        }
+    };
+    
+
+    
 
     const colors = isDarkMode
         ? {
@@ -67,6 +111,8 @@ const App = () => {
             }
             let currentLocation = await Location.getCurrentPositionAsync({});
             setLocation(currentLocation.coords);
+fetchAddressFromCoords(currentLocation.coords);
+
         })();
     }, []);
 
@@ -112,6 +158,8 @@ const App = () => {
             formData.append('description', description);
             formData.append('latitude', location.latitude);
             formData.append('longitude', location.longitude);
+            formData.append('address', address);
+
 
             // Append each image individually
             images.forEach((image, index) => {
@@ -593,7 +641,12 @@ const App = () => {
                                     latitudeDelta: 0.005,
                                     longitudeDelta: 0.005,
                                 }}
-                                onPress={(e) => setLocation(e.nativeEvent.coordinate)} // Allow user to change location
+                                onPress={(e) => {
+                                    const newCoords = e.nativeEvent.coordinate;
+                                    setLocation(newCoords);
+                                    fetchAddressFromCoords(newCoords);
+                                }}
+                                 // Allow user to change location
                             >
                                 <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} title="You are here" />
                                 {/* Show a marker if the user taps a new location */}
@@ -610,6 +663,11 @@ const App = () => {
                     )}
                 </View>
             </Tooltip>
+
+            <Text style={{ marginHorizontal: 20, color: colors.text, fontSize: 14, marginTop: 10 }}>
+    📍 Address: {address || 'Tap on the map to get address'}
+</Text>
+
 
             {/* Description */}
             <Tooltip

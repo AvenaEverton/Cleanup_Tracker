@@ -298,13 +298,15 @@ app.post("/addEvent", upload.single('image'), (req, res) => {
     });
   });
 
-app.get("/events", (req, res) => {
-  const sql = "SELECT * FROM events ORDER BY event_date ASC";
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: "Database error" });
-    res.json(results);
+  app.get("/api/events", (req, res) => {
+    const sql = "SELECT * FROM events ORDER BY event_date ASC";
+    db.query(sql, (err, results) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+      res.json(results);
+    });
   });
-});
+  
+  
 
 app.get("/events/:id", (req, res) => {
     const { id } = req.params;
@@ -581,15 +583,17 @@ app.get('/api/admin/report-details', async (req, res) => {
 // AFTER
 app.post("/api/reports", upload.array("images"), async (req, res) => {
   try {
-    const { userId, latitude, longitude, description } = req.body;
+    const { userId, latitude, longitude, description, address } = req.body;
+
     const images = req.files;
 
     // insert report row
     const [result] = await db.promise().query(
-      `INSERT INTO reports (user, latitude, longitude, description, timestamp)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [userId, latitude, longitude, description]
+      `INSERT INTO reports (user, latitude, longitude, description, address, timestamp)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [userId, latitude, longitude, description, address]
     );
+    
     const reportId = result.insertId;
 
     // prepare the image‐insert promises

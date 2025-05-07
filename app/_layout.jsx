@@ -9,6 +9,7 @@ export default function Layout() {
         <Stack.Screen name="LoginScreen" />
         <Stack.Screen name="register" />
         <Stack.Screen name="intro" />
+        
       </Stack>
     </ThemeProvider>
   );

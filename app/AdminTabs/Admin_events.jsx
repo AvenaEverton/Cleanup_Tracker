@@ -1,10 +1,25 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { TextInput, Button, Card, Dialog, Portal, Provider } from "react-native-paper";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import {
+  TextInput,
+  Button,
+  Card,
+  Dialog,
+  Portal,
+  Provider,
+} from "react-native-paper";
 import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import axios from "axios";
+import { useNavigation } from "@react-navigation/native";
+import AdminMapReports from "./AdminMapReports";
 
 const AdminEvents = () => {
   const [eventName, setEventName] = useState("");
@@ -17,7 +32,20 @@ const AdminEvents = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [isFieldFocused, setIsFieldFocused] = useState(false); // State para i-track kung may field na naka-focus
+  const [isFieldFocused, setIsFieldFocused] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
+  const [reportData, setReportData] = useState([]);
+
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    axios
+      .get("https://backend-rt98.onrender.com/api/admin/report-details")
+      .then((response) => setReportData(response.data))
+      .catch((error) =>
+        console.error("Error fetching reports:", error)
+      );
+  }, []);
 
   const pickDocument = async () => {
     let result = await DocumentPicker.getDocumentAsync({});
@@ -29,48 +57,44 @@ const AdminEvents = () => {
   const handleCreateEvent = async () => {
     try {
       const formData = new FormData();
-      
-      // Add all text fields
-      formData.append('eventName', eventName);
-      formData.append('description', description);
-      formData.append('date', date.toISOString().split('T')[0]);
-      formData.append('time', time.toTimeString().split(' ')[0]);
-      formData.append('location', location);
-      formData.append('additionalDetails', additionalDetails);
-  
-      // Add the image file if one was selected
+      formData.append("eventName", eventName);
+      formData.append("description", description);
+      formData.append("date", date.toISOString().split("T")[0]);
+      formData.append("time", time.toTimeString().split(" ")[0]);
+      formData.append("location", location);
+      formData.append("additionalDetails", additionalDetails);
+
       if (files.length > 0) {
-        formData.append('image', {
+        formData.append("image", {
           uri: files[0].uri,
           name: files[0].name,
-          type: files[0].mimeType || 'image/jpeg',
+          type: files[0].mimeType || "image/jpeg",
         });
       }
-  
+
       const response = await axios.post(
-        'https://backend-rt98.onrender.com/addEvent',
+        "https://backend-rt98.onrender.com/addEvent",
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
-  
+
       alert(response.data.message);
-      console.log('Event Created:', response.data);
+      console.log("Event Created:", response.data);
     } catch (error) {
       if (error.response) {
         alert(`Failed to create event: ${error.response.data.message}`);
       } else {
-        console.error('Error creating event:', error);
-        alert('Failed to create event.');
+        console.error("Error creating event:", error);
+        alert("Failed to create event.");
       }
     }
   };
 
   const handleCancel = () => {
-    // Reset all state variables to their initial values
     setEventName("");
     setDescription("");
     setDate(new Date());
@@ -80,189 +104,227 @@ const AdminEvents = () => {
     setFiles([]);
     setShowDatePicker(false);
     setShowTimePicker(false);
-    setIsFieldFocused(false); // Reset the focus state
+    setIsFieldFocused(false);
   };
 
   return (
     <Provider>
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.header}>Create New Event</Text>
-              <TextInput
-                label="Event Name"
-                value={eventName}
-                onChangeText={(text) => {
-                  setEventName(text);
-                  setIsFieldFocused(true); // Itakda ang state na naka-focus
-                }}
-                mode="outlined"
-                style={styles.input}
-                placeholder="Enter event name"
-                outlineColor="#4CAF50" // Green border
-                selectionColor="#4CAF50"
-                onFocus={() => setIsFieldFocused(true)} // Itakda ang state na naka-focus
-                onBlur={() => setIsFieldFocused(false)}
-              />
-
-              <TextInput
-                label="Description"
-                value={description}
-                onChangeText={(text) => {
-                  setDescription(text);
-                  setIsFieldFocused(true);
-                }}
-                mode="outlined"
-                multiline
-                style={styles.descriptionInput}
-                placeholder="Provide a brief description of the event"
-                outlineColor="#4CAF50" // Green border
-                selectionColor="#4CAF50"
-                onFocus={() => setIsFieldFocused(true)}
-                onBlur={() => setIsFieldFocused(false)}
-              />
-
-              {/* Date Picker */}
-              <TouchableOpacity
-                onPress={() => {
-                  setShowDatePicker(true);
-                  setIsFieldFocused(true);
-                }}
-                style={styles.pickerButton}
-              >
-                <MaterialIcons name="event" size={20} color="#007bff" />
-                <Text style={styles.pickerText}>{date.toLocaleDateString()}</Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false);
-                    if (selectedDate) setDate(selectedDate);
-                  }}
-                />
-              )}
-
-              {/* Time Picker */}
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTimePicker(true);
-                  setIsFieldFocused(true);
-                }}
-                style={styles.pickerButton}
-              >
-                <MaterialIcons name="schedule" size={20} color="#007bff" />
-                <Text style={styles.pickerText}>{time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
-              </TouchableOpacity>
-              {showTimePicker && (
-                <DateTimePicker
-                  value={time}
-                  mode="time"
-                  display="default"
-                  onChange={(event, selectedTime) => {
-                    setShowTimePicker(false);
-                    if (selectedTime) setTime(selectedTime);
-                  }}
-                />
-              )}
-
-              <TextInput
-                label="Location"
-                value={location}
-                onChangeText={(text) => {
-                  setLocation(text);
-                  setIsFieldFocused(true);
-                }}
-                mode="outlined"
-                style={styles.input}
-                placeholder="Enter event location"
-                outlineColor="#4CAF50" // Green border
-                selectionColor="#4CAF50"
-                onFocus={() => setIsFieldFocused(true)}
-                onBlur={() => setIsFieldFocused(false)}
-              />
-
-              <TextInput
-                label="Additional Details"
-                value={additionalDetails}
-                onChangeText={(text) => {
-                  setAdditionalDetails(text);
-                  setIsFieldFocused(true);
-                }}
-                mode="outlined"
-                multiline
-                style={styles.descriptionInput}
-                placeholder="Any other important information?"
-                outlineColor="#4CAF50" // Green border
-                selectionColor="#4CAF50"
-                onFocus={() => setIsFieldFocused(true)}
-                onBlur={() => setIsFieldFocused(false)}
-              />
-
-              {/* File Upload */}
-              <TouchableOpacity
-                onPress={() => {
-                  pickDocument();
-                  setIsFieldFocused(true);
-                }}
-                style={styles.uploadButton}
-              >
-                <FontAwesome name="paperclip" size={20} color="white" />
-                <Text style={styles.uploadText}>Attach Files</Text>
-              </TouchableOpacity>
-              {files.length > 0 && (
-                <View style={styles.filesContainer}>
-                  <Text style={styles.filesHeader}>Attachments:</Text>
-                  {files.map((file, index) => (
-                    <Text key={index} style={styles.fileText}>
-                      - {file.name}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </Card.Content>
-          </Card>
-        </ScrollView>
-
-        {/* Sticky Footer Buttons */}
-        <View style={styles.bottomButtons}>
-          {isFieldFocused && ( // Ipakita lamang kung may naka-focus na field
-            <Button
-              mode="outlined"
-              onPress={() => {
-                handleCancel();
-              }}
-              style={styles.cancelButton}
-            >
-              Cancel
-            </Button>
-          )}
-          <Button mode="contained" onPress={() => setModalVisible(true)} style={styles.createButton}>
-            Create Event
+        {/* Toggle Button */}
+        <View style={{ padding: 10, alignItems: "center" }}>
+          <Button
+            mode="outlined"
+            onPress={() => setShowMapView(!showMapView)}
+            style={{ width: 220 }}
+          >
+            {showMapView ? "Back to Event Form" : "View Reports Map"}
           </Button>
         </View>
 
-        {/* Confirmation Modal */}
-        <Portal>
-          <Dialog visible={modalVisible} onDismiss={() => setModalVisible(false)}>
-            <Dialog.Title>Confirm Event Details</Dialog.Title>
-            <Dialog.Content>
-              <Text>
-                Are you sure you want to create the event "{eventName}" scheduled for {date.toLocaleDateString()} at{" "}
-                {time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} at {location}?
-              </Text>
-            </Dialog.Content>
-            <Dialog.Actions>
-              <Button onPress={() => setModalVisible(false)}>Edit</Button>
-              <Button onPress={handleCreateEvent} style={styles.confirmButton}>
-                Confirm & Create
+        {showMapView ? (
+          <AdminMapReports reportData={reportData} />
+        ) : (
+          <>
+            <ScrollView contentContainerStyle={styles.scrollContainer}>
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text style={styles.header}>Create New Event</Text>
+
+                  <TextInput
+                    label="Event Name"
+                    value={eventName}
+                    onChangeText={(text) => {
+                      setEventName(text);
+                      setIsFieldFocused(true);
+                    }}
+                    mode="outlined"
+                    style={styles.input}
+                    placeholder="Enter event name"
+                    outlineColor="#4CAF50"
+                    selectionColor="#4CAF50"
+                    onFocus={() => setIsFieldFocused(true)}
+                    onBlur={() => setIsFieldFocused(false)}
+                  />
+
+                  <TextInput
+                    label="Description"
+                    value={description}
+                    onChangeText={(text) => {
+                      setDescription(text);
+                      setIsFieldFocused(true);
+                    }}
+                    mode="outlined"
+                    multiline
+                    style={styles.descriptionInput}
+                    placeholder="Provide a brief description of the event"
+                    outlineColor="#4CAF50"
+                    selectionColor="#4CAF50"
+                    onFocus={() => setIsFieldFocused(true)}
+                    onBlur={() => setIsFieldFocused(false)}
+                  />
+
+                  {/* Date Picker */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowDatePicker(true);
+                      setIsFieldFocused(true);
+                    }}
+                    style={styles.pickerButton}
+                  >
+                    <MaterialIcons name="event" size={20} color="#007bff" />
+                    <Text style={styles.pickerText}>
+                      {date.toLocaleDateString()}
+                    </Text>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={date}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowDatePicker(false);
+                        if (selectedDate) setDate(selectedDate);
+                      }}
+                    />
+                  )}
+
+                  {/* Time Picker */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowTimePicker(true);
+                      setIsFieldFocused(true);
+                    }}
+                    style={styles.pickerButton}
+                  >
+                    <MaterialIcons name="schedule" size={20} color="#007bff" />
+                    <Text style={styles.pickerText}>
+                      {time.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                  {showTimePicker && (
+                    <DateTimePicker
+                      value={time}
+                      mode="time"
+                      display="default"
+                      onChange={(event, selectedTime) => {
+                        setShowTimePicker(false);
+                        if (selectedTime) setTime(selectedTime);
+                      }}
+                    />
+                  )}
+
+                  <TextInput
+                    label="Location"
+                    value={location}
+                    onChangeText={(text) => {
+                      setLocation(text);
+                      setIsFieldFocused(true);
+                    }}
+                    mode="outlined"
+                    style={styles.input}
+                    placeholder="Enter event location"
+                    outlineColor="#4CAF50"
+                    selectionColor="#4CAF50"
+                    onFocus={() => setIsFieldFocused(true)}
+                    onBlur={() => setIsFieldFocused(false)}
+                  />
+
+                  <TextInput
+                    label="Additional Details"
+                    value={additionalDetails}
+                    onChangeText={(text) => {
+                      setAdditionalDetails(text);
+                      setIsFieldFocused(true);
+                    }}
+                    mode="outlined"
+                    multiline
+                    style={styles.descriptionInput}
+                    placeholder="Any other important information?"
+                    outlineColor="#4CAF50"
+                    selectionColor="#4CAF50"
+                    onFocus={() => setIsFieldFocused(true)}
+                    onBlur={() => setIsFieldFocused(false)}
+                  />
+
+                  {/* File Upload */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      pickDocument();
+                      setIsFieldFocused(true);
+                    }}
+                    style={styles.uploadButton}
+                  >
+                    <FontAwesome name="paperclip" size={20} color="white" />
+                    <Text style={styles.uploadText}>Attach Files</Text>
+                  </TouchableOpacity>
+                  {files.length > 0 && (
+                    <View style={styles.filesContainer}>
+                      <Text style={styles.filesHeader}>Attachments:</Text>
+                      {files.map((file, index) => (
+                        <Text key={index} style={styles.fileText}>
+                          - {file.name}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </Card.Content>
+              </Card>
+            </ScrollView>
+
+            {/* Sticky Footer Buttons */}
+            <View style={styles.bottomButtons}>
+              {isFieldFocused && (
+                <Button
+                  mode="outlined"
+                  onPress={handleCancel}
+                  style={styles.cancelButton}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                mode="contained"
+                onPress={() => setModalVisible(true)}
+                style={styles.createButton}
+              >
+                Create Event
               </Button>
-            </Dialog.Actions>
-          </Dialog>
-        </Portal>
+            </View>
+
+            {/* Confirmation Modal */}
+            <Portal>
+              <Dialog
+                visible={modalVisible}
+                onDismiss={() => setModalVisible(false)}
+              >
+                <Dialog.Title>Confirm Event Details</Dialog.Title>
+                <Dialog.Content>
+                  <Text>
+                    Are you sure you want to create the event "{eventName}"
+                    scheduled for {date.toLocaleDateString()} at{" "}
+                    {time.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    at {location}?
+                  </Text>
+                </Dialog.Content>
+                <Dialog.Actions>
+                  <Button onPress={() => setModalVisible(false)}>Edit</Button>
+                  <Button
+                    onPress={handleCreateEvent}
+                    style={styles.confirmButton}
+                  >
+                    Confirm & Create
+                  </Button>
+                </Dialog.Actions>
+              </Dialog>
+            </Portal>
+          </>
+        )}
       </View>
     </Provider>
   );
@@ -286,17 +348,13 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 20,
     backgroundColor: "#f8f8f8",
-    color: "#333",
     fontSize: 16,
-    borderColor: "#4CAF50", // Green border
   },
   descriptionInput: {
     height: 100,
     marginBottom: 20,
     backgroundColor: "#f8f8f8",
-    color: "#333",
     fontSize: 16,
-    borderColor: "#4CAF50", // Green border
   },
   pickerButton: {
     flexDirection: "row",
@@ -304,7 +362,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: "#4CAF50", // Green border
+    borderColor: "#4CAF50",
     borderRadius: 8,
     marginBottom: 20,
     backgroundColor: "#fff",
@@ -323,8 +381,6 @@ const styles = StyleSheet.create({
   filesContainer: { marginTop: 15 },
   filesHeader: { fontWeight: "bold", marginBottom: 5, color: "#555" },
   fileText: { fontSize: 14, color: "#777", marginBottom: 3 },
-
-  /* Sticky Footer */
   bottomButtons: {
     position: "absolute",
     bottom: 0,
@@ -354,4 +410,3 @@ const styles = StyleSheet.create({
 });
 
 export default AdminEvents;
-
