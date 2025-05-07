@@ -36,16 +36,7 @@ const AdminEvents = () => {
   const [showMapView, setShowMapView] = useState(false);
   const [reportData, setReportData] = useState([]);
 
-  const navigation = useNavigation();
 
-  useEffect(() => {
-    axios
-      .get("https://backend-rt98.onrender.com/api/admin/report-details")
-      .then((response) => setReportData(response.data))
-      .catch((error) =>
-        console.error("Error fetching reports:", error)
-      );
-  }, []);
 
   const pickDocument = async () => {
     let result = await DocumentPicker.getDocumentAsync({});
@@ -111,15 +102,7 @@ const AdminEvents = () => {
     <Provider>
       <View style={styles.container}>
         {/* Toggle Button */}
-        <View style={{ padding: 10, alignItems: "center" }}>
-          <Button
-            mode="outlined"
-            onPress={() => setShowMapView(!showMapView)}
-            style={{ width: 220 }}
-          >
-            {showMapView ? "Back to Event Form" : "View Reports Map"}
-          </Button>
-        </View>
+   
 
         {showMapView ? (
           <AdminMapReports reportData={reportData} />

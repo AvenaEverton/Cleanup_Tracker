@@ -12,7 +12,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import Tooltip from 'react-native-walkthrough-tooltip';
 import { Modal } from 'react-native';
 
-
 const NEW_GREEN = '#4CAF50';
 const ORANGE = '#FFA500';
 
@@ -46,8 +45,7 @@ const EventCard = ({ event }) => {
         </View>
       </TouchableOpacity>
     );
-  };
-  
+};
 
 export default function HomeScreen() {
     const { darkMode } = useContext(ThemeContext);
@@ -58,7 +56,7 @@ export default function HomeScreen() {
     const [username, setUsername] = useState(routeUsername || "Guest");
     const [localProfilePicture, setLocalProfilePicture] = useState(null);
     const [events, setEvents] = useState([]);
-    const [allEvents, setAllEvents] = useState([]); // New state for all events
+    const [allEvents, setAllEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const newEventRef = useRef(null);
     const [showEventsModal, setShowEventsModal] = useState(false);
@@ -80,9 +78,6 @@ export default function HomeScreen() {
     const [profileTooltipVisible, setProfileTooltipVisible] = useState(false);
 
     const floatingTipRef = useRef(null);
-
-
-    // New state and ref for the floating tip
     const [showFloatingTip, setShowFloatingTip] = useState(true);
 
     const fetchEvents = useCallback(async () => {
@@ -97,10 +92,8 @@ export default function HomeScreen() {
                         : null
                 }));
                 
-                // Set all events
                 setAllEvents(eventsWithImages);
                 
-                // Filter recent events (events from the last 30 days)
                 const recentEvents = eventsWithImages.filter(event => {
                     const eventDate = new Date(event.date);
                     const today = new Date();
@@ -442,59 +435,8 @@ export default function HomeScreen() {
                     </Tooltip>
                 </View>
             </View>
-            <Tooltip
-                isVisible={recentEventTooltipVisible}
-                content={
-                    <View style={styles.tooltipContent}>
-                        <Text style={styles.tooltipTitle}>Recent Events</Text>
-                        <Text style={styles.tooltipDescription}>
-                            Check out the most recent events happening around you.
-                        </Text>
-                    </View>
-                }
-                onClose={() => setRecentEventTooltipVisible(false)}
-            >
-                <View style={[styles.recentEvent, darkMode ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.recentEventText, darkMode ? styles.darkText : styles.lightText]}>
-                        Recent Events
-                        <TouchableOpacity
-                            onPress={testEndpoint}
-                            style={{ marginLeft: 10 }}
-                        >
-                            <Ionicons name="bug-outline" size={16} color={darkMode ? "#FF5252" : "#F44336"} />
-                        </TouchableOpacity>
-                    </Text>
 
-                    {loading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="small" color="#4CAF50" />
-                        </View>
-                    ) : events.length > 0 ? (
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ paddingRight: 20 }}
-                        >
-                            {events.map((event) => (
-                                <EventCard key={event.id} event={event} />
-                            ))}
-                        </ScrollView>
-                    ) : (
-                        <View style={styles.noEventsContainer}>
-                            <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
-                            <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
-                                No events available
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.retryButton}
-                                onPress={fetchEvents}
-                            >
-                                <Text style={styles.retryText}>Try Again</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                </View>
-            </Tooltip>
+
 
             <Tooltip
                 isVisible={joinCleanUpTooltipVisible}
@@ -541,75 +483,75 @@ export default function HomeScreen() {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>All Events</Text>
                         <ScrollView>
-                        {loading ? (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="small" color="#4CAF50" />
-      <Text style={{ marginTop: 10 }}>Loading events...</Text>
-    </View>
-  ) : allEvents && allEvents.length > 0 ? (
-    allEvents.map((event) => (
-      <View
-        key={event.id}
-        style={{
-          marginBottom: 15,
-          padding: 15,
-          backgroundColor: darkMode ? '#1e1e1e' : '#f9f9f9',
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: '#ccc',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          elevation: 2,
-        }}
-      >
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: darkMode ? '#fff' : '#333', marginBottom: 6 }}>
-          📌 {event.title}
-        </Text>
+                            {loading ? (
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator size="small" color="#4CAF50" />
+                                    <Text style={{ marginTop: 10 }}>Loading events...</Text>
+                                </View>
+                            ) : allEvents && allEvents.length > 0 ? (
+                                allEvents.map((event) => (
+                                    <View
+                                        key={event.id}
+                                        style={{
+                                            marginBottom: 15,
+                                            padding: 15,
+                                            backgroundColor: darkMode ? '#1e1e1e' : '#f9f9f9',
+                                            borderRadius: 10,
+                                            borderWidth: 1,
+                                            borderColor: '#ccc',
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.1,
+                                            shadowRadius: 3,
+                                            elevation: 2,
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: darkMode ? '#fff' : '#333', marginBottom: 6 }}>
+                                            📌 {event.title}
+                                        </Text>
 
-        <Text style={{ fontSize: 14, color: darkMode ? '#ddd' : '#555', marginBottom: 10 }}>
-          {event.description}
-        </Text>
+                                        <Text style={{ fontSize: 14, color: darkMode ? '#ddd' : '#555', marginBottom: 10 }}>
+                                            {event.description}
+                                        </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          <Ionicons name="calendar-outline" size={16} color={darkMode ? '#4CAF50' : '#008000'} />
-          <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-            {event.formattedDate || event.date}
-          </Text>
-        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                            <Ionicons name="calendar-outline" size={16} color={darkMode ? '#4CAF50' : '#008000'} />
+                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                                {event.formattedDate || event.date}
+                                            </Text>
+                                        </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          <Ionicons name="time-outline" size={16} color={darkMode ? '#FFA500' : '#ff8c00'} />
-          <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-            {event.time || 'TBD'}
-          </Text>
-        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                            <Ionicons name="time-outline" size={16} color={darkMode ? '#FFA500' : '#ff8c00'} />
+                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                                {event.time || 'TBD'}
+                                            </Text>
+                                        </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          <Ionicons name="location-outline" size={16} color={darkMode ? '#87CEEB' : '#2196F3'} />
-          <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-            {event.location || 'No location'}
-          </Text>
-        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                            <Ionicons name="location-outline" size={16} color={darkMode ? '#87CEEB' : '#2196F3'} />
+                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                                {event.location || 'No location'}
+                                            </Text>
+                                        </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="information-circle-outline" size={16} color={darkMode ? '#FFB6C1' : '#e91e63'} />
-          <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-            {event.additionalDetails || 'No additional details'}
-          </Text>
-        </View>
-      </View>
-    ))
-  ) : (
-    <View style={styles.noEventsContainer}>
-      <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
-      <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
-        No events available
-      </Text>
-    </View>
-  )}
-</ScrollView>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="information-circle-outline" size={16} color={darkMode ? '#FFB6C1' : '#e91e63'} />
+                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                                {event.additionalDetails || 'No additional details'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))
+                            ) : (
+                                <View style={styles.noEventsContainer}>
+                                    <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
+                                    <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
+                                        No events available
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
 
                         <TouchableOpacity 
                             style={styles.closeButton}
@@ -720,12 +662,11 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         paddingHorizontal: 10,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 }, // ✅ FIXED
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 5,
     },
-    
     menuItem: {
         alignItems: "center",
     },
@@ -747,7 +688,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "#008000",
         height: 'auto',
-        minHeight: 160, // Adjusted height to be a little smaller
+        minHeight: 160,
         justifyContent: "flex-start",
     },
     recentEventText: {
@@ -761,7 +702,7 @@ const styles = StyleSheet.create({
         height: 200,
         justifyContent: "space-between",
         marginTop: -20,
-        marginBottom: 20, // Added margin bottom
+        marginBottom: 20,
     },
     cleanUpText: {
         fontSize: 24,
@@ -818,7 +759,7 @@ const styles = StyleSheet.create({
         height: 140,
         borderTopLeftRadius: 10,
         borderTopRightRadius: 10,
-        backgroundColor: '#f5f5f5', // Fallback background
+        backgroundColor: '#f5f5f5',
     },
     eventImagePlaceholder: {
         justifyContent: 'center',
@@ -875,7 +816,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 20,
     },
-    // Floating tip icon styles
     floatingTip: {
         position: 'absolute',
         top: 20,
@@ -894,7 +834,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        height: 140, // Match your event card height
+        height: 140,
     },
     noEventsContainer: {
         alignItems: 'center',
@@ -917,36 +857,34 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
     },
-
     modalOverlay: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.6)',
-      },
-      modalContent: {
+    },
+    modalContent: {
         backgroundColor: '#fff',
         borderRadius: 10,
         padding: 20,
         width: '90%',
         maxHeight: '80%',
-      },
-      modalTitle: {
+    },
+    modalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 10,
-      },
-      closeButton: {
+    },
+    closeButton: {
         marginTop: 15,
         alignSelf: 'center',
         backgroundColor: NEW_GREEN,
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 5,
-      },
-      closeButtonText: {
+    },
+    closeButtonText: {
         color: '#fff',
         fontWeight: 'bold',
-      }
-      
+    }
 });
