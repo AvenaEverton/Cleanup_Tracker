@@ -16,6 +16,7 @@
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.3",
+    "cloudinary": "^2.6.1",
     "cors": "^2.8.5",
     "expo-image-picker": "^16.0.6",
     "expo-location": "^18.0.10",

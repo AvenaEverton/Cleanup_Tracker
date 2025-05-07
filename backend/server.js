@@ -1,5 +1,5 @@
 const express = require("express");
-const mysql = require("mysql2");
+const mysql = require('mysql2/promise'); // Using promise version
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
@@ -8,27 +8,34 @@ const socketIo = require("socket.io");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: "*" } });
 
-// app.use(cors({
-//   origin: ['http://localhost:3000', 'https://backend-rt98.onrender.com'],
-//   methods: ['GET', 'POST'],
-//   credentials: true,
-// }));
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.json());
 app.use(express.static("uploads"));
-// at the top of server.js
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "uploads"))
-);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+cloudinary.config({ 
+  cloud_name: 'dgkzqmtgy', 
+  api_key: '138712578489821', 
+  api_secret: 't60XhGuihc92t01GZtNFpR7dXU0' // Click 'View API Keys' above to copy your API secret
+});
 
-// Set up storage for image uploads
+// Database connection pool
+const db = mysql.createPool({ 
+  host: 'localhost',
+  user: 'root',
+  database: 'clean_up_tracker',
+  waitForConnections: true,
+  connectionLimit: 10
+});
+
+// Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = "uploads/";
@@ -43,95 +50,91 @@ const storage = multer.diskStorage({
   },
 });
 
-// Initialize multer
-//dependency to install =  "npm install multer"
 const upload = multer({ storage: storage });
 
-// const pool = mysql.createPool({
-//   host: process.env.DB_HOST,
-//   user: 'avnadmin',
-//   password: process.env.DB_PASSWORD,
-//   database: 'cleanup_tracker',
-//   connectionLimit: 10, // Adjust as needed
-//   port: 17290,
-//   ssl: {
-//     ca: fs.readFileSync(path.join(__dirname, 'cert', 'ca.pem')),
-//     rejectUnauthorized: true
-//   }
-// });
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "clean_up_tracker",
-});
-
-db.connect((err) => {
-  if (err) {
-    console.error("❌ MySQL connection failed:", err);
-  } else {
-    console.log("✅ Connected to MySQL Database");
-  }
-});
-
+// Login endpoint
 app.post("/api/login", async (req, res) => {
   const { emailOrUsername, password } = req.body;
 
   if (!emailOrUsername || !password) {
-    return res.status(400).json({ error: "Email/Username and password are required" });
+    return res.status(400).json({ 
+      success: false,
+      error: "Email/Username and password are required" 
+    });
   }
 
   try {
-    const userSql = "SELECT * FROM users WHERE email = ? OR username = ?";
-    const [user] = await db.promise().query(userSql, [emailOrUsername, emailOrUsername]);
+    const [users] = await db.query(
+      "SELECT * FROM users WHERE email = ? OR username = ?", 
+      [emailOrUsername, emailOrUsername]
+    );
 
-    if (!user || user.length === 0) {
-      return res.status(401).json({ error: "User not found" });
+    if (!users || users.length === 0) {
+      return res.status(401).json({ 
+        success: false,
+        error: "Invalid credentials" 
+      });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user[0].password);
+    const user = users[0];
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    
     if (!passwordMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ 
+        success: false,
+        error: "Invalid credentials" 
+      });
     }
 
-    const { user_id, role, status } = user[0];
-    res.json({ success: true, user: { user_id, role, status } });
+    res.json({ 
+      success: true,
+      user: {
+        user_id: user.user_id,
+        role: user.role,
+        status: user.status
+      }
+    });
+
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ 
+      success: false,
+      error: "Internal server error" 
+    });
   }
 });
 
+// Registration endpoint
 app.post("/api/register", async (req, res) => {
   const { fullName, username, email, password, userType, idImagePath } = req.body;
-  console.log("Registration Request Body:", req.body); // Log the received data
 
   if (!fullName || !username || !email || !password) {
     return res.status(400).json({ message: "All fields are required!" });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const [result] = await db.query(
+      `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`,
+      [fullName, username, email, hashedPassword, userType, idImagePath]
+    );
 
-  const query = `INSERT INTO users (fullName, username, email, password, userType, idImagePath, createdAt, role, status)
-                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'User', 'Pending')`;
-
-  db.query(query, [fullName, username, email, hashedPassword, userType, idImagePath], (err, result) => {
-    if (err) {
-      console.error("Database Error during registration:", err); // Log database errors
-      return res.status(500).json({ message: "Database error!" });
-    }
-    console.log("Registration successful:", result); // Log successful registration
     res.status(201).json({ message: "Registration successful!" });
-  });
+  } catch (error) {
+    console.error("Database Error during registration:", error);
+    res.status(500).json({ message: "Database error!" });
+  }
 });
 
+// Admin dashboard endpoint
 app.get("/api/admin/dashboard", async (req, res) => {
   try {
-    const [usersResult] = await db.promise().query("SELECT COUNT(*) AS totalUsers FROM users");
-    const [eventsResult] = await db.promise().query("SELECT COUNT(*) AS totalEvents FROM events");
-    const [approvalsResult] = await db.promise().query("SELECT COUNT(*) AS totalPending FROM users WHERE status = 'Pending'"); // Assuming 'Pending' is the status for pending approvals
-    const [reportsResult] = await db.promise().query("SELECT COUNT(*) AS totalReports FROM reports");
+    const [usersResult] = await db.query("SELECT COUNT(*) AS totalUsers FROM users");
+    const [eventsResult] = await db.query("SELECT COUNT(*) AS totalEvents FROM events");
+    const [approvalsResult] = await db.query("SELECT COUNT(*) AS totalPending FROM users WHERE status = 'Pending'");
+    const [reportsResult] = await db.query("SELECT COUNT(*) AS totalReports FROM reports");
 
     res.json({
       totalUsers: usersResult[0].totalUsers,
@@ -140,34 +143,39 @@ app.get("/api/admin/dashboard", async (req, res) => {
       reports: reportsResult[0].totalReports,
     });
   } catch (error) {
-    console.error("Error fetching dashboard data from MySQL:", error);
+    console.error("Error fetching dashboard data:", error);
     res.status(500).json({ error: "Failed to fetch dashboard data" });
   }
 });
 
+// Socket.io setup
 let connectedUsers = {};
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("registerUser", (userId) => {
+  socket.on("registerUser", async (userId) => {
     connectedUsers[userId] = socket.id;
 
-    const sql = "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC";
-    db.query(sql, [userId], (err, results) => {
-      if (!err && results.length > 0) {
-        let lastEventNotification = null;
+    try {
+      const [results] = await db.query(
+        "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC",
+        [userId]
+      );
+
+      let lastEventNotification = null;
+      if (results.length > 0) {
         for (let i = 0; i < results.length; i++) {
           if (results[i].message.startsWith("New event:")) {
             lastEventNotification = results[i];
             break;
           }
         }
-        socket.emit("unreadNotifications", { notifications: results, newEvent: lastEventNotification });
-      } else {
-        socket.emit("unreadNotifications", { notifications: [], newEvent: null });
       }
-    });
+      socket.emit("unreadNotifications", { notifications: results, newEvent: lastEventNotification });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
   });
 
   socket.on("disconnect", () => {
@@ -178,33 +186,34 @@ io.on("connection", (socket) => {
   });
 });
 
-app.post("/api/markNotificationsRead", (req, res) => {
+// Notification endpoints
+app.post("/api/markNotificationsRead", async (req, res) => {
   const { notificationId } = req.body;
-  const sql = "UPDATE notifications SET is_read = 1 WHERE id = ?";
-  db.query(sql, [notificationId], (err) => {
-    if (err) return res.status(500).json({ error: "Database error" });
+  
+  try {
+    await db.query("UPDATE notifications SET is_read = 1 WHERE id = ?", [notificationId]);
     res.json({ message: "Notification marked as read" });
-  });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
-app.get("/getNotifications", (req, res) => {
+app.get("/getNotifications", async (req, res) => {
   const { userId } = req.query;
 
   if (!userId) {
     return res.status(400).json({ error: "User ID is required" });
   }
 
-  const sql = `
-    SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at
-    FROM notifications
-    WHERE user_id = ?
-    ORDER BY created_at DESC`;
-
-  db.query(sql, [userId], (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching notifications:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
+  try {
+    const [results] = await db.query(
+      `SELECT notif_id, user_id, event_id, message, IFNULL(created_at, NOW()) AS created_at
+       FROM notifications
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
+      [userId]
+    );
 
     let lastEventNotification = null;
     for (let i = 0; i < results.length; i++) {
@@ -214,66 +223,78 @@ app.get("/getNotifications", (req, res) => {
       }
     }
     res.json({ notifications: results, newEvent: lastEventNotification });
-  });
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
-app.post("/addEvent", (req, res) => {
+// Event endpoints
+app.post("/addEvent", async (req, res) => {
   const { eventName, description, date, time, location, additionalDetails, createdBy } = req.body;
 
-  const checkSql = "SELECT * FROM events WHERE event_name = ? AND event_date = ? AND event_time = ?";
-  db.query(checkSql, [eventName, date, time], (err, results) => {
-    if (err) {
-      console.error("❌ Error checking event:", err);
-      return res.status(500).json({ error: "Database error" });
+  try {
+    // Check if event exists
+    const [existingEvents] = await db.query(
+      "SELECT * FROM events WHERE event_name = ? AND event_date = ? AND event_time = ?",
+      [eventName, date, time]
+    );
+
+    if (existingEvents.length > 0) {
+      return res.status(400).json({ message: "Event already exists!" });
     }
-    if (results.length > 0) return res.status(400).json({ message: "Event already exists!" });
 
-    const insertSql = `INSERT INTO events (event_name, description, event_date, event_time, location, add_details, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  db.query(insertSql, [eventName, description, date, time, location, additionalDetails, createdBy], (err, result) => {
-      if (err) {
-        console.error("❌ Error inserting event:", err);
-        return res.status(500).json({ error: "Failed to add event" });
-      }
+    // Insert new event
+    const [result] = await db.query(
+      `INSERT INTO events (event_name, description, event_date, event_time, location, add_details, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [eventName, description, date, time, location, additionalDetails, createdBy]
+    );
 
-      const eventId = result.insertId;
+    const eventId = result.insertId;
 
-      const notificationSql = `INSERT INTO notifications (user_id, event_id, message, is_read, created_at) SELECT user_id, ?, ?, 0, NOW() FROM users`;
-      db.query(notificationSql, [eventId, `New event: ${eventName}`], (err) => {
-        if (err) {
-          console.error("❌ Error inserting notifications:", err);
-          return res.status(500).json({ error: "Failed to create notifications" });
-        }
+    // Create notifications for all users
+    await db.query(
+      `INSERT INTO notifications (user_id, event_id, message, is_read, created_at) 
+       SELECT user_id, ?, ?, 0, NOW() FROM users`,
+      [eventId, `New event: ${eventName}`]
+    );
 
-        io.emit("newEvent", { eventName, description, date, time, location });
-        res.json({ message: "Event added successfully!" });
-      });
-    });
-  });
+    io.emit("newEvent", { eventName, description, date, time, location });
+    res.json({ message: "Event added successfully!" });
+  } catch (error) {
+    console.error("Error adding event:", error);
+    res.status(500).json({ error: "Failed to add event" });
+  }
 });
 
-app.get("/events", (req, res) => {
-  const sql = "SELECT * FROM events ORDER BY event_date ASC";
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: "Database error" });
+app.get("/events", async (req, res) => {
+  try {
+    const [results] = await db.query("SELECT * FROM events ORDER BY event_date ASC");
     res.json(results);
-  });
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
-app.get("/events/:id", (req, res) => {
+app.get("/events/:id", async (req, res) => {
   const { id } = req.params;
-  const sql = "SELECT * FROM events WHERE event_id = ?";
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      console.error("Error fetching event details:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
+  
+  try {
+    const [results] = await db.query("SELECT * FROM events WHERE event_id = ?", [id]);
+    
     if (results.length > 0) {
       res.json(results[0]);
     } else {
       res.status(404).json({ message: "Event not found" });
     }
-  });
+  } catch (error) {
+    console.error("Error fetching event:", error);
+    res.status(500).json({ error: "Database error" });
+  }
 });
+
+// Admin user management endpoints
 app.get('/api/admin/users', async (req, res) => {
   const filter = req.query.filter;
   let sql = 'SELECT user_id, username, status FROM users';
@@ -282,44 +303,22 @@ app.get('/api/admin/users', async (req, res) => {
     sql += ` WHERE status = '${filter}'`;
   }
 
-  console.log('API Request received with filter:', filter);
-  console.log('SQL Query:', sql);
-
   try {
-    const [users] = await db.promise().query(sql);
-    console.log('SQL Query Result (users):', users);
+    const [users] = await db.query(sql);
 
-    const countQueries = {
-      approved: `SELECT COUNT(*) as count FROM users WHERE status = 'approved'`,
-      pending: `SELECT COUNT(*) as count FROM users WHERE status = 'pending'`,
-      restricted: `SELECT COUNT(*) as count FROM users WHERE status = 'restricted'`,
-    };
-
-    const countResults = await Promise.all(
-      Object.values(countQueries).map((query) => db.promise().query(query))
-    );
-
-    const approvedCount = countResults[0][0][0].count;
-    const pendingCount = countResults[1][0][0].count;
-    const restrictedCount = countResults[2][0][0].count;
+    const [approvedCount] = await db.query("SELECT COUNT(*) as count FROM users WHERE status = 'approved'");
+    const [pendingCount] = await db.query("SELECT COUNT(*) as count FROM users WHERE status = 'pending'");
+    const [restrictedCount] = await db.query("SELECT COUNT(*) as count FROM users WHERE status = 'restricted'");
 
     res.json({
       users,
-      approvedCount,
-      pendingCount,
-      restrictedCount,
+      approvedCount: approvedCount[0].count,
+      pendingCount: pendingCount[0].count,
+      restrictedCount: restrictedCount[0].count,
       totalUsers: users.length,
     });
-
-    console.log('API Response sent:', {
-      users,
-      approvedCount,
-      pendingCount,
-      restrictedCount,
-      totalUsers: users.length,
-    });
-  } catch (err) {
-    console.error('Error fetching users or counts:', err);
+  } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -333,16 +332,15 @@ app.post('/api/admin/users/:userId/status', async (req, res) => {
   }
 
   try {
-    const sql = 'UPDATE users SET status = ? WHERE user_id = ?';
-    await db.promise().query(sql, [status, userId]);
+    await db.query('UPDATE users SET status = ? WHERE user_id = ?', [status, userId]);
     res.json({ message: 'User status updated successfully' });
-  } catch (err) {
-    console.error('Error updating user status:', err);
+  } catch (error) {
+    console.error('Error updating user status:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
 
-// New API endpoint to handle joining an event
+// Event participation endpoint
 app.post('/joinEvent', async (req, res) => {
   const { userId, eventId } = req.body;
 
@@ -351,235 +349,133 @@ app.post('/joinEvent', async (req, res) => {
   }
 
   try {
-    const connection = await db.promise();
-
-    // Check if the user has already joined the event
-    const [existingParticipation] = await connection.execute(
+    // Check if user already joined
+    const [existing] = await db.query(
       'SELECT * FROM event_participants WHERE user_id = ? AND event_id = ?',
       [userId, eventId]
     );
 
-    if (existingParticipation.length > 0) {
+    if (existing.length > 0) {
       return res.status(409).json({ message: 'You have already joined this event.' });
     }
 
-    // Insert the new participation record
-    await connection.execute(
+    // Add participation
+    await db.query(
       'INSERT INTO event_participants (user_id, event_id) VALUES (?, ?)',
       [userId, eventId]
     );
 
     res.status(200).json({ message: 'Successfully joined the event.' });
-
   } catch (error) {
     console.error('Error joining event:', error);
+    
     if (error.code === 'ER_NO_SUCH_TABLE') {
       return res.status(500).json({ message: 'Database error: The event_participants table does not exist.' });
-    } else if (error.code === 'ER_FK_CONSTRAINT_FOREIGN_KEY') {
+    }
+    if (error.code === 'ER_FK_CONSTRAINT_FOREIGN_KEY') {
       return res.status(400).json({ message: 'Invalid User ID or Event ID.' });
     }
+    
     res.status(500).json({ message: 'Failed to join the event.' });
   }
 });
 
-
-
-
-// Endpoint to update user status (e.g., Approve or reject)
-app.put('/api/admin/users/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { status } = req.body;
-
-  console.log(`Updating user ${userId} to status: ${status}`);
-
-  // Validate the status
-  if (!status || (status !== 'Approved' && status !== 'Restricted')) {
-    return res.status(400).json({ error: 'Invalid status provided.' });
-  }
-
-  try {
-    // Use a parameterized query to prevent SQL injection
-    const sql = 'UPDATE users SET status = ? WHERE user_id = ?';
-    const params = [status, userId];
-
-    const [result] = await db.promise().query(sql, params);
-
-    // Check if the user was found and updated
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'User not found or status not updated.' });
-    }
-
-    res.json({ message: 'User status updated successfully.' });
-
-  } catch (err) {
-    // Handle database errors
-    console.error('Error updating user status:', err);
-    res.status(500).json({ error: 'Database error: ' + err.message });
-  }
-});
-
-app.get('/api/admin/recent-events', async (req, res) => {
-  try {
-    const [recentEvents] = await db.promise().query(
-      'SELECT event_name, event_date, created_at FROM events ORDER BY created_at DESC LIMIT 5' // Added 'created_at' to the SELECT statement
-    );
-    res.json(recentEvents);
-  } catch (error) {
-    console.error('Error fetching recent events from MySQL:', error);
-    res.status(500).json({ error: 'Failed to fetch recent events' });
-  }
-});
-
-
-app.get('/api/admin/participants-per-event', async (req, res) => {
-  try {
-    const [participants] = await db.promise().query(`
-      SELECT e.event_name, COUNT(ep.user_id) AS participant_count
-      FROM events e
-      LEFT JOIN event_participants ep ON e.event_id = ep.event_id
-      GROUP BY e.event_name
-      ORDER BY participant_count DESC;
-    `); // Adjust table and column names if necessary
-    res.json(participants);
-  } catch (error) {
-    console.error('Error fetching participants per event from MySQL:', error);
-    res.status(500).json({ error: 'Failed to fetch participants per event' });
-  }
-});
-
-app.get('/api/admin/report-details', async (req, res) => {
-  try {
-    const [rows] = await db.promise().query(`
-      SELECT
-        r.report_id,
-        r.user,
-        u.fullName  AS full_name,
-        r.latitude,
-        r.longitude,
-        r.description,
-        r.timestamp,
-        ri.image_path
-      FROM reports r
-      LEFT JOIN users         u  ON u.user_id           = r.user
-      LEFT JOIN report_images ri ON ri.report_id       = r.report_id
-    `);
-
-    // fold rows into one object per report_id
-    const reports = rows.reduce((acc, r) => {
-      if (!acc[r.report_id]) {
-        acc[r.report_id] = {
-          report_id:  r.report_id,
-          user:       r.user,
-          full_name: r.full_name || 'Unknown User', // added default
-          latitude:   r.latitude,
-          longitude:  r.longitude,
-          description: r.description,
-          timestamp:  r.timestamp,
-          images:     []
-        };
-      }
-      if (r.image_path) {
-        acc[r.report_id].images.push(r.image_path);
-      }
-      return acc;
-    }, {});
-
-    res.json(Object.values(reports));
-  } catch (err) {
-    console.error("Error fetching reports:", err);
-    res.status(500).json({ error: "Failed to fetch reports" });
-  }
-});
-
-// AFTER
+// Report endpoints
 app.post("/api/reports", upload.array("images"), async (req, res) => {
   try {
     const { userId, latitude, longitude, description } = req.body;
     const images = req.files;
 
-    // insert report row
-    const [result] = await db.promise().query(
+    if (!userId || !latitude || !longitude || !description) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (!images || images.length === 0) {
+      return res.status(400).json({ message: "No images uploaded" });
+    }
+
+    // Insert report (unchanged)
+    const [result] = await db.query(
       `INSERT INTO reports (user, latitude, longitude, description, timestamp)
        VALUES (?, ?, ?, ?, NOW())`,
       [userId, latitude, longitude, description]
     );
+
     const reportId = result.insertId;
 
-    // prepare the image‐insert promises
-    const inserts = (images || []).map((image) =>
-      db.promise().query(
-        "INSERT INTO report_images (report_id, image_path) VALUES (?, ?)",
-        [reportId, image.filename]
-      )
+    // MODIFIED IMAGE HANDLING - Upload to Cloudinary instead of DB
+    const uploadedImages = await Promise.all(
+      images.map(async (image) => {
+        try {
+          // Upload to Cloudinary
+          const cloudinaryResult = await cloudinary.uploader.upload(image.path, {
+            folder: "reports",
+            use_filename: true
+          });
+          
+          // Store Cloudinary URL in database instead of image data
+          await db.query(
+            "INSERT INTO report_images (report_id, image_url) VALUES (?, ?)",
+            [reportId, cloudinaryResult.secure_url]
+          );
+          
+          // Delete temporary file
+          fs.unlinkSync(image.path);
+          
+          return cloudinaryResult.secure_url;
+        } catch (uploadError) {
+          console.error("Failed to upload image:", uploadError);
+          // Still store the report even if image upload fails
+          return null;
+        }
+      })
     );
 
-    // NOW you can await them
-    await Promise.all(inserts);
-
-    res.status(201).json({ message: "Report and images uploaded successfully!" });
-  } catch (err) {
-    console.error("Error creating report:", err);
-    res.status(500).json({ message: "Failed to create report" });
+    res.status(201).json({ 
+      message: "Report created and images uploaded successfully!",
+      imageUrls: uploadedImages.filter(url => url !== null)
+    });
+    
+  } catch (error) {
+    console.error("Error creating report:", error);
+    res.status(500).json({ 
+      message: "Failed to create report", 
+      error: error.message 
+    });
   }
 });
 
+// Endpoint to get user stats: total reports and joined events
+app.get('/api/user/stats/:userId', async (req, res) => {
+  const { userId } = req.params;
 
-
-// GET user full name by ID
-app.get('/api/users/:id', (req, res) => {
-  const { id } = req.params;
-
-  const sql = "SELECT fullName FROM users WHERE user_id = ?";
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      console.error('Error fetching user fullName:', err);
-      return res.status(500).json({ error: 'Failed to fetch user fullName' });
-    }
-
-    if (results.length > 0) {
-      res.json(results[0]); // send { fullName: "Juan Dela Cruz" }
-    } else {
-      res.status(404).json({ error: 'User not found' });
-    }
-  });
-});
-
-// API endpoint to fetch recent report images
-app.get('/api/recent-report-images', async (req, res) => {
-  const { limit = 5 } = req.query;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required.' });
+  }
 
   try {
-    // Validate the limit
-    const parsedLimit = parseInt(limit, 10);
-    if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 20) {
-      return res.status(400).json({ error: 'Invalid limit parameter. Must be a number between 1 and 20.' });
-    }
-
-    // Use a prepared statement to prevent SQL injection
-    const [rows] = await pool.execute(
-      `
-      SELECT
-        ri.image_path
-      FROM
-        report_images ri
-      JOIN reports r ON ri.report_id = r.id
-      ORDER BY r.created_at DESC
-      LIMIT ?
-      `,
-      [parsedLimit]
+    // Count reports by the user
+    const [reportCountResult] = await db.query(
+      'SELECT COUNT(*) AS reportCount FROM reports WHERE user = ?',
+      [userId]
     );
 
-    const imagePaths = rows.map(row => row.image_path);
-    res.json({ images: imagePaths });
+    // Count events the user has joined
+    const [eventCountResult] = await db.query(
+      'SELECT COUNT(*) AS eventCount FROM event_participants WHERE user_id = ?',
+      [userId]
+    );
+
+    res.json({
+      reportCount: reportCountResult[0].reportCount,
+      eventCount: eventCountResult[0].eventCount
+    });
   } catch (error) {
-    console.error('Error fetching recent report images:', error);
-    res.status(500).json({ error: 'Failed to fetch recent report images' });
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({ error: 'Database error fetching user statistics' });
   }
 });
 
-// const PORT = process.env.PORT || 5000;
-// server.listen(PORT, '0.0.0.0', () => {
-//   console.log(`🚀 Backend running on port ${PORT}`);
-// });
+// Start server
 const PORT = 5000;
 server.listen(PORT, () => console.log(`🚀 Backend running at http://192.168.1.23:${PORT}`));
