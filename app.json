@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "CleanupTracker",
-    "slug": "CleanupTracker",
+    "name": "NasLively",
+    "slug": "NasLively",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/NasLogo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/NasAppIcon.png",
         "backgroundColor": "#ffffff"
       }
     },
