@@ -659,11 +659,39 @@ app.get('/api/events/recent', async (req, res) => {
     }
   });
 
-  // In your server.js, add this test route temporarily:
-app.get('/api/test-endpoint', (req, res) => {
-    res.json({ message: "Backend is working!", status: 200 });
-  });
+  app.get('/api/user/stats/:userId', async (req, res) => {
+    const { userId } = req.params;
+  
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required.' });
+    }
+  
+    try {
+      // Use db.promise().query for database interaction
+      const [reportCountResult] = await db.promise().query(
+        'SELECT COUNT(*) AS reportCount FROM reports WHERE user = ?',
+        [userId]
+      );
+  
+      const [eventCountResult] = await db.promise().query(
+        'SELECT COUNT(*) AS eventCount FROM event_participants WHERE user_id = ?',
+        [userId]
+      );
+  
+      res.json({
+        reportCount: reportCountResult[0].reportCount,
+        eventCount: eventCountResult[0].eventCount
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      res.status(500).json({ error: 'Database error fetching user statistics' });
+    }
+});
 
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ message: "Backend is working!", timestamp: new Date() });
+});
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running on port ${PORT}`);

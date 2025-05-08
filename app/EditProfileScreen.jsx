@@ -93,20 +93,33 @@ export default function EditProfileScreen() {
         }
     };
 
-    const handleSaveProfile = async () => {
-        try {
-            await AsyncStorage.setItem('selectedIconIndex', selectedIconIndex.toString());
-            await AsyncStorage.setItem('selectedBorderIndex', selectedBorderIndex.toString());
-            if (profilePicture) {
-                await AsyncStorage.setItem('profilePicture', profilePicture);
-            } else {
-                await AsyncStorage.removeItem('profilePicture');
-            }
-            router.back();
-        } catch (error) {
-            console.error("Error saving profile:", error);
+    // In EditProfileScreen.js
+const handleSaveProfile = async () => {
+    try {
+        // Save all profile settings
+        const profileData = {
+            selectedIconIndex,
+            selectedBorderIndex,
+            profilePicture,
+            iconName: profileIcons[selectedIconIndex].name,
+            iconSource: profileIcons[selectedIconIndex].source
+        };
+        
+        await AsyncStorage.setItem('profileSettings', JSON.stringify(profileData));
+        
+        // Also save to userData for backward compatibility
+        const userDataString = await AsyncStorage.getItem("userData");
+        if (userDataString) {
+            const userData = JSON.parse(userDataString);
+            userData.profilePicture = profilePicture;
+            await AsyncStorage.setItem("userData", JSON.stringify(userData));
         }
-    };
+        
+        router.back();
+    } catch (error) {
+        console.error("Error saving profile:", error);
+    }
+};
 
     const handleCancel = () => {
         router.back();

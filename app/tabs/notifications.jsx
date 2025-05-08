@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback, useContext } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, FlatList, ImageBackground, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, FlatList, ImageBackground } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { formatDistanceToNow, differenceInHours, differenceInDays, differenceInMonths } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { differenceInHours, differenceInDays, differenceInMonths } from 'date-fns';
 import { ThemeContext } from '../../context/ThemeContext';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
@@ -23,7 +22,7 @@ Notifications.setNotificationHandler({
     }),
 });
 
-const NotificationsScreen = ({ onNewEvent }) => {
+const NotificationsScreen = () => {
     const [notifications, setNotifications] = useState([]);
     const [userId, setUserId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -32,10 +31,20 @@ const NotificationsScreen = ({ onNewEvent }) => {
     const [selectedNotification, setSelectedNotification] = useState(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isJoining, setIsJoining] = useState(false);
+    const [noNewEvent, setNoNewEvent] = useState(false);
+    
     const navigation = useNavigation();
+    const route = useRoute();
     const { darkMode: isDarkMode } = useContext(ThemeContext);
-
+    
+    // Safely get params with defaults
+    const params = route.params || {};
+    const autoOpenEventId = params.autoOpenEventId;
+    const notificationId = params.notificationId;
+    const isFromJoinButton = params.isFromJoinButton;
+    
     const newEventSound = useRef(new Audio.Sound());
+    const flatListRef = useRef(null);
 
     const colors = isDarkMode
         ? {
@@ -68,8 +77,7 @@ const NotificationsScreen = ({ onNewEvent }) => {
                 const errorText = await response.text();
                 throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
-            const eventData = await response.json();
-            return eventData;
+            return await response.json();
         } catch (error) {
             console.error("Error fetching event details:", error);
             Alert.alert("Error", `Failed to load event details: ${error.message}`);
@@ -87,71 +95,65 @@ const NotificationsScreen = ({ onNewEvent }) => {
     }, []);
 
     const fetchNotifications = useCallback(async (currentUserId) => {
-        console.log("API Query userId:", currentUserId);
         try {
-            const response = await fetch(
-                `${API_BASE_URL}/getNotifications?userId=${currentUserId}`
-            );
-
+            const response = await fetch(`${API_BASE_URL}/getNotifications?userId=${currentUserId}`);
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            console.log("API Response Data:", data);
 
             const notificationsWithDetails = await Promise.all(
-                data.notifications.map(async (notif) => {
+                data.notifications?.map(async (notif) => {
                     if (notif.event_id) {
                         const eventDetails = await fetchEventDetails(notif.event_id);
                         return { ...notif, ...eventDetails };
                     }
                     return notif;
-                })
+                }) || []
             );
+
             setNotifications(notificationsWithDetails);
 
-            const storedViewedNotifications = await AsyncStorage.getItem(
-                NOTIFICATIONS_VIEWED_KEY
-            );
-            let initialViewed = {};
-            if (storedViewedNotifications) {
-                initialViewed = JSON.parse(storedViewedNotifications);
-            }
+            const storedViewedNotifications = await AsyncStorage.getItem(NOTIFICATIONS_VIEWED_KEY);
+            const initialViewed = storedViewedNotifications ? JSON.parse(storedViewedNotifications) : {};
+            
             const updatedViewed = { ...initialViewed };
             notificationsWithDetails.forEach((notif) => {
                 if (!updatedViewed[notif.notif_id]) {
                     updatedViewed[notif.notif_id] = false;
                 }
             });
+            
             setViewedNotifications(updatedViewed);
+            await AsyncStorage.setItem(NOTIFICATIONS_VIEWED_KEY, JSON.stringify(updatedViewed));
+            
+            return notificationsWithDetails;
         } catch (err) {
             setError(err.message || "Failed to fetch notifications");
-            console.error(" Fetch error:", err);
+            console.error("Fetch error:", err);
+            return [];
         } finally {
             setLoading(false);
         }
-    }, [fetchEventDetails]);  // Removed 'notifications' from dependency array
+    }, [fetchEventDetails]);
 
     useEffect(() => {
         const fetchUserIdAndInitialNotifications = async () => {
             setLoading(true);
-            setError(null);
             try {
                 const storedUserId = await AsyncStorage.getItem("userId");
                 if (storedUserId) {
-                    console.log("Retrieved userId:", storedUserId);
                     setUserId(storedUserId);
-                    await fetchNotifications(storedUserId);
+                    const fetchedNotifications = await fetchNotifications(storedUserId);
+                    
+                    if (isFromJoinButton && fetchedNotifications.filter(n => n.event_id).length === 0) {
+                        setNoNewEvent(true);
+                    }
                 } else {
-                    const errorMessage = "userId not found in AsyncStorage";
-                    setError(errorMessage);
-                    console.error(errorMessage);
-                    setLoading(false);
+                    throw new Error("userId not found in AsyncStorage");
                 }
             } catch (err) {
-                const errorMessage = err.message || "Failed to fetch userId";
-                setError(errorMessage);
+                setError(err.message || "Failed to fetch userId");
                 console.error("AsyncStorage error:", err);
                 setLoading(false);
             }
@@ -167,11 +169,66 @@ const NotificationsScreen = ({ onNewEvent }) => {
 
         return () => {
             clearInterval(intervalId);
-            if (newEventSound.current) {
-                newEventSound.current.unloadAsync();
+            newEventSound.current?.unloadAsync();
+        };
+    }, [fetchNotifications, userId, isFromJoinButton]);
+
+    useEffect(() => {
+        const autoOpenNotification = async () => {
+            if ((autoOpenEventId && notificationId) || isFromJoinButton) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                let notificationToOpen;
+                
+                if (autoOpenEventId && notificationId) {
+                    notificationToOpen = notifications.find(
+                        notif => notif.event_id === autoOpenEventId && notif.notif_id === notificationId
+                    );
+                } else if (isFromJoinButton) {
+                    const eventNotifications = notifications
+                        .filter(notif => notif.event_id)
+                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    
+                    if (eventNotifications.length > 0) {
+                        notificationToOpen = eventNotifications[0];
+                    } else {
+                        setNoNewEvent(true);
+                        return;
+                    }
+                }
+                
+                if (notificationToOpen) {
+                    const updatedViewed = {
+                        ...viewedNotifications,
+                        [notificationToOpen.notif_id]: true,
+                    };
+                    setViewedNotifications(updatedViewed);
+                    await AsyncStorage.setItem(NOTIFICATIONS_VIEWED_KEY, JSON.stringify(updatedViewed));
+                    
+                    setSelectedNotification(notificationToOpen);
+                    setIsModalVisible(true);
+
+                    if (isFromJoinButton && flatListRef.current) {
+                        const index = notifications.findIndex(
+                            n => n.notif_id === notificationToOpen.notif_id
+                        );
+                        if (index >= 0) {
+                            flatListRef.current.scrollToIndex({ 
+                                index, 
+                                animated: true,
+                                viewOffset: 50,
+                                viewPosition: 0.5
+                            });
+                        }
+                    }
+                }
             }
         };
-    }, [fetchNotifications, userId, playNewEventSound]);  // Removed newEventSound
+        
+        if (notifications.length > 0) {
+            autoOpenNotification();
+        }
+    }, [notifications, autoOpenEventId, notificationId, isFromJoinButton, viewedNotifications]);
 
     const handleNotificationPress = async (notification) => {
         const updatedViewed = {
@@ -179,23 +236,20 @@ const NotificationsScreen = ({ onNewEvent }) => {
             [notification.notif_id]: true,
         };
         setViewedNotifications(updatedViewed);
+        await AsyncStorage.setItem(NOTIFICATIONS_VIEWED_KEY, JSON.stringify(updatedViewed));
 
-        try {
-            await AsyncStorage.setItem(
-                NOTIFICATIONS_VIEWED_KEY,
-                JSON.stringify(updatedViewed)
-            );
-        } catch (error) {
-            console.error("Error saving viewed notifications:", error);
-        }
-
-        setSelectedNotification(notification.event_id ? notification : { message: notification.message, created_at: notification.created_at, notif_id: notification.notif_id });
+        setSelectedNotification(notification.event_id ? notification : { 
+            message: notification.message, 
+            created_at: notification.created_at, 
+            notif_id: notification.notif_id 
+        });
         setIsModalVisible(true);
     };
 
     const closeModal = () => {
         setIsModalVisible(false);
         setSelectedNotification(null);
+        setNoNewEvent(false);
     };
 
     const handleJoinEvent = async (eventId) => {
@@ -203,22 +257,17 @@ const NotificationsScreen = ({ onNewEvent }) => {
             Alert.alert("Error", "User ID not found. Please try again.");
             return;
         }
+        
         setIsJoining(true);
         try {
             const response = await fetch(`${API_BASE_URL}/joinEvent`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    userId: userId,
-                    eventId: eventId,
-                }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, eventId }),
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(await response.text());
             }
 
             Alert.alert("Success", "You have successfully joined the event!");
@@ -232,7 +281,6 @@ const NotificationsScreen = ({ onNewEvent }) => {
     };
 
     const renderItem = ({ item }) => {
-        console.log("Rendering item:", item);
         if (!item || typeof item !== "object") {
             return (
                 <View style={[styles.notificationItem, styles.invalidItem]}>
@@ -243,25 +291,24 @@ const NotificationsScreen = ({ onNewEvent }) => {
         }
 
         const isViewed = viewedNotifications[item.notif_id];
-        const isEvent = item.event_id !== undefined && item.event_id !== null;
-        const eventDate = item.event_date ? new Date(item.event_date) : null;
+        const isEvent = item.event_id !== undefined;
         const now = new Date();
         const notificationCreatedAt = new Date(item.created_at);
         const diffHours = isEvent ? differenceInHours(now, notificationCreatedAt) : 0;
-        const diffDays = isEvent ? differenceInDays(now, notificationCreatedAt) : 0;
-        const diffMonths = isEvent ? differenceInMonths(now, notificationCreatedAt) : 0;
         const isEventEnded = isEvent && diffHours >= EVENT_ENDED_THRESHOLD_HOURS;
 
         let eventLabel = '';
         if (isEvent) {
             if (diffHours < 24) {
                 eventLabel = "New Event";
-            }
-            else if (diffDays < 30) {
-                eventLabel = `Event (${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago)`;
-            }
-            else {
-                eventLabel = `Event (${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago)`;
+            } else {
+                const diffDays = differenceInDays(now, notificationCreatedAt);
+                if (diffDays < 30) {
+                    eventLabel = `Event (${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago)`;
+                } else {
+                    const diffMonths = differenceInMonths(now, notificationCreatedAt);
+                    eventLabel = `Event (${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago)`;
+                }
             }
         }
 
@@ -270,7 +317,7 @@ const NotificationsScreen = ({ onNewEvent }) => {
                 style={[
                     styles.notificationItem,
                     isViewed ? styles.viewedNotification : styles.unviewedNotification,
-                    isEvent ? { backgroundColor: colors.eventContainer } : {}
+                    isEvent && { backgroundColor: colors.eventContainer }
                 ]}
                 onPress={() => handleNotificationPress(item)}
             >
@@ -281,23 +328,18 @@ const NotificationsScreen = ({ onNewEvent }) => {
                     <Text style={[
                         styles.message,
                         isViewed ? styles.viewedMessage : styles.unviewedMessage,
-                        isEvent ? { color: colors.eventText } : {}
+                        isEvent && { color: colors.eventText }
                     ]}>
                         {isEvent ? eventLabel : item.message || "No message"}
                     </Text>
-                    <Text style={[styles.detail, isEvent ? { color: colors.detailText } : {}]}>
-                        {item.created_at
-                            ? new Date(item.created_at).toLocaleString()
-                            : "No date"}
+                    <Text style={[styles.detail, isEvent && { color: colors.detailText }]}>
+                        {item.created_at ? new Date(item.created_at).toLocaleString() : "No date"}
                         {isEventEnded && <Text style={styles.endedLabel}> Event Ended</Text>}
                     </Text>
                 </View>
             </TouchableOpacity>
         );
     };
-
-    const anyUnviewed = Object.values(viewedNotifications).some((v) => !v);
-
 
     return (
         <ImageBackground source={backgroundImage} style={styles.backgroundImage}>
@@ -307,82 +349,121 @@ const NotificationsScreen = ({ onNewEvent }) => {
                     <Text style={[styles.header, { color: colors.text }]}>Notifications</Text>
                 </View>
 
-                {loading && (
+                {loading ? (
                     <View style={styles.loadingContainer}>
-                        <Text style={[styles.loadingText, { color: colors.text }]}>Fetching your notifications...</Text>
+                        <Text style={[styles.loadingText, { color: colors.text }]}>Fetching notifications...</Text>
                     </View>
-                )}
-
-                {error && (
+                ) : error ? (
                     <View style={styles.errorContainer}>
                         <Text style={styles.errorText}>
                             <Feather name="alert-triangle" size={18} color="red" /> Error: {error}
                         </Text>
                     </View>
-                )}
-
-                {!loading && !error && notifications && notifications.length > 0 && (
+                ) : notifications?.length > 0 ? (
                     <FlatList
+                        ref={flatListRef}
                         data={notifications}
-                        keyExtractor={(item) => item?.notif_id?.toString() || "uniqueId"}
+                        keyExtractor={(item) => item?.notif_id?.toString() || Math.random().toString()}
                         renderItem={renderItem}
                         ItemSeparatorComponent={() => <View style={styles.separator} />}
                         style={styles.listContainer}
+                        onScrollToIndexFailed={(info) => {
+                            // Fallback for scroll to index failure
+                            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+                        }}
                     />
-                )}
-
-                {!loading && !error && (!notifications || notifications.length === 0) && (
+                ) : (
                     <View style={styles.emptyContainer}>
                         <Feather name="inbox" size={40} color="#aaa" style={styles.emptyIcon} />
-                        <Text style={[styles.emptyText, { color: colors.text }]}>No new notifications.</Text>
+                        <Text style={[styles.emptyText, { color: colors.text }]}>No notifications</Text>
                     </View>
                 )}
 
                 <Modal
                     animationType="slide"
                     transparent={true}
-                    visible={isModalVisible}
+                    visible={isModalVisible || noNewEvent}
                     onRequestClose={closeModal}
                 >
                     <View style={styles.modalOverlay}>
                         <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-                            <ScrollView style={styles.modalScrollView}>
-                                <Text style={[styles.modalTitle, { color: colors.text }]}>Notification Details</Text>
-                                {selectedNotification && selectedNotification.event_name && (
-                                    <>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Event Name: {selectedNotification.event_name}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Description: {selectedNotification.description}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Date: {selectedNotification.event_date}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Time: {selectedNotification.event_time}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Location: {selectedNotification.location}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Details: {selectedNotification.add_details}</Text>
-                                        {selectedNotification.file_url && (
-                                            <Text style={[styles.modalText, { color: colors.text }]}>File URL: {selectedNotification.file_url}</Text>
+                            {noNewEvent ? (
+                                <>
+                                    <Text style={[styles.modalTitle, { color: colors.text }]}>No New Events</Text>
+                                    <Text style={[styles.modalText, { color: colors.text }]}>
+                                        There are currently no active clean-up events available.
+                                    </Text>
+                                    <View style={styles.modalButtons}>
+                                        <TouchableOpacity 
+                                            style={[styles.modalButton, styles.closeButton]} 
+                                            onPress={closeModal}
+                                        >
+                                            <Text style={styles.modalButtonText}>Close</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            ) : (
+                                <>
+                                    <ScrollView style={styles.modalScrollView}>
+                                        <Text style={[styles.modalTitle, { color: colors.text }]}>
+                                            {selectedNotification?.event_name ? "Event Details" : "Notification"}
+                                        </Text>
+                                        {selectedNotification?.event_name ? (
+                                            <>
+                                                <Text style={[styles.modalText, { color: colors.text }]}>
+                                                    Event: {selectedNotification.event_name}
+                                                </Text>
+                                                <Text style={[styles.modalText, { color: colors.text }]}>
+                                                    Description: {selectedNotification.description}
+                                                </Text>
+                                                <Text style={[styles.modalText, { color: colors.text }]}>
+                                                    Date: {selectedNotification.event_date}
+                                                </Text>
+                                                <Text style={[styles.modalText, { color: colors.text }]}>
+                                                    Time: {selectedNotification.event_time}
+                                                </Text>
+                                                <Text style={[styles.modalText, { color: colors.text }]}>
+                                                    Location: {selectedNotification.location}
+                                                </Text>
+                                                {selectedNotification.file_url && (
+                                                    <Text style={[styles.modalText, { color: colors.text }]}>
+                                                        Attachment: {selectedNotification.file_url}
+                                                    </Text>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <Text style={[styles.modalText, { color: colors.text }]}>
+                                                {selectedNotification?.message}
+                                            </Text>
                                         )}
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Created At: {new Date(selectedNotification.created_at).toLocaleString()}</Text>
-                                    </>
-                                )}
-                                {selectedNotification && !selectedNotification.event_name && (
-                                    <>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Message: {selectedNotification.message}</Text>
-                                        <Text style={[styles.modalText, { color: colors.text }]}>Created At: {new Date(selectedNotification.created_at).toLocaleString()}</Text>
-                                    </>
-                                )}
-                            </ScrollView>
-                            <View style={styles.modalButtons}>
-                                {selectedNotification?.event_id && differenceInHours(new Date(), new Date(selectedNotification.created_at)) < EVENT_ENDED_THRESHOLD_HOURS && (
-                                    <TouchableOpacity
-                                        style={[styles.modalButton, styles.joinButton]}
-                                        onPress={() => handleJoinEvent(selectedNotification.event_id)}
-                                        disabled={isJoining}
-                                    >
-                                        <Text style={styles.modalButtonText}>{isJoining ? "Joining..." : "Join Event"}</Text>
-                                    </TouchableOpacity>
-                                )}
-                                <TouchableOpacity style={[styles.modalButton, styles.closeButton]} onPress={closeModal}>
-                                    <Text style={styles.modalButtonText}>Close</Text>
-                                </TouchableOpacity>
-                            </View>
+                                        <Text style={[styles.modalText, { color: colors.text }]}>
+                                            Received: {selectedNotification?.created_at ? 
+                                                new Date(selectedNotification.created_at).toLocaleString() : 
+                                                "Unknown date"}
+                                        </Text>
+                                    </ScrollView>
+                                    <View style={styles.modalButtons}>
+                                        {selectedNotification?.event_id && 
+                                            differenceInHours(new Date(), new Date(selectedNotification.created_at)) < EVENT_ENDED_THRESHOLD_HOURS && (
+                                            <TouchableOpacity
+                                                style={[styles.modalButton, styles.joinButton]}
+                                                onPress={() => handleJoinEvent(selectedNotification.event_id)}
+                                                disabled={isJoining}
+                                            >
+                                                <Text style={styles.modalButtonText}>
+                                                    {isJoining ? "Joining..." : "Join Event"}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity 
+                                            style={[styles.modalButton, styles.closeButton]} 
+                                            onPress={closeModal}
+                                        >
+                                            <Text style={styles.modalButtonText}>Close</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
                         </View>
                     </View>
                 </Modal>
