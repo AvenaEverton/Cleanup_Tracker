@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/NasAppIcon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.justine_123.NasLively"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dd411528-d8d9-4d13-940b-417c6f03f320"
+      }
     }
   }
 }

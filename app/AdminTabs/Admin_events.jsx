@@ -28,28 +28,39 @@ const AdminEvents = () => {
 
   const handleCreateEvent = async () => {
     try {
-      const response = await axios.post("https://backend-rt98.onrender.com/addEvent", {
-        eventName,
-        description,
-        date: date.toISOString().split("T")[0], //YYYY-MM-DD
-        time: time.toTimeString().split(" ")[0], // HH:MM:SS
-        location,
-        additionalDetails,
-      });
-
+      const formData = new FormData();
+      formData.append("eventName", eventName);
+      formData.append("description", description);
+      formData.append("date", date.toISOString().split("T")[0]);
+      formData.append("time", time.toTimeString().split(" ")[0]);
+      formData.append("location", location);
+      formData.append("additionalDetails", additionalDetails);
+  
+      const response = await axios.post(
+        "https://backend-rt98.onrender.com/addEvent",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+  
       alert(response.data.message);
       console.log("Event Created:", response.data);
+      setModalVisible(false);
+      handleCancel(); // Reset form fields
     } catch (error) {
+      console.error("Error creating event:", error);
       if (error.response) {
-        // console.error("Error creating event:", error.response.data);
-        alert(`Failed to create event: ${error.response.data.message}`);
+        alert(`Failed to create event: ${error.response.data.message || error.response.data.error}`);
       } else {
-        console.error("Error creating event:", error);
-        alert("Failed to create event.");
+        alert("Failed to create event. Please check your connection.");
       }
+      setModalVisible(false);
     }
   };
-
+  
   const handleCancel = () => {
     // Reset all state variables to their initial values
     setEventName("");

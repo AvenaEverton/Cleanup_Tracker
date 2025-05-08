@@ -260,7 +260,7 @@ const NotificationsScreen = () => {
         
         setIsJoining(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/joinEvent`, {
+            const response = await fetch(`${API_BASE_URL}/events/${eventId}/join`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId, eventId }),

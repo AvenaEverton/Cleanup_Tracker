@@ -83,26 +83,11 @@ export default function HomeScreen() {
     const fetchEvents = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await axios.get("https://backend-rt98.onrender.com/api/events");
+            const response = await axios.get("https://backend-rt98.onrender.com/events");
             if (response.data) {
-                const eventsWithImages = response.data.map(event => ({
-                    ...event,
-                    imageUrl: event.image_url
-                        ? `https://backend-rt98.onrender.com/uploads/${event.image_url}`
-                        : null
-                }));
-                
-                setAllEvents(eventsWithImages);
-                
-                const recentEvents = eventsWithImages.filter(event => {
-                    const eventDate = new Date(event.date);
-                    const today = new Date();
-                    const diffTime = today - eventDate;
-                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                    return diffDays <= 30;
-                });
-                
-                setEvents(recentEvents);
+                // Just use the raw event data without image URL transformation
+                setAllEvents(response.data);
+                setEvents(response.data);
             }
         } catch (error) {
             console.error("Failed to fetch events:", error);
@@ -116,7 +101,7 @@ export default function HomeScreen() {
 
     const testEndpoint = async () => {
         try {
-            const testUrl = "https://backend-rt98.onrender.com/api/events";
+            const testUrl = "https://backend-rt98.onrender.com/events";
             console.log("Testing endpoint:", testUrl);
 
             const response = await fetch(testUrl);
@@ -501,8 +486,8 @@ export default function HomeScreen() {
                         <Ionicons name="arrow-up" size={40} color={ORANGE} />
                     </Animated.View>
                     <View>
-                        <Text style={styles.cleanUpText}>Reach up to 500</Text>
-                        <Text style={styles.cleanUpCount}>100/500</Text>
+                        <Text style={styles.cleanUpText}>Let's Clean up</Text>
+                        <Text style={styles.cleanUpCount}></Text>
                     </View>
                     <TouchableOpacity style={styles.joinButton}>
                         <Text style={styles.joinButtonText}>Join Clean-Up</Text>
@@ -512,95 +497,98 @@ export default function HomeScreen() {
 
             {/* All Events Modal */}
             <Modal
-                visible={showEventsModal}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowEventsModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>All Events</Text>
-                        <ScrollView>
-                            {loading ? (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="small" color="#4CAF50" />
-                                    <Text style={{ marginTop: 10 }}>Loading events...</Text>
-                                </View>
-                            ) : allEvents && allEvents.length > 0 ? (
-                                allEvents.map((event) => (
-                                    <View
-                                        key={event.id}
-                                        style={{
-                                            marginBottom: 15,
-                                            padding: 15,
-                                            backgroundColor: darkMode ? '#1e1e1e' : '#f9f9f9',
-                                            borderRadius: 10,
-                                            borderWidth: 1,
-                                            borderColor: '#ccc',
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 2 },
-                                            shadowOpacity: 0.1,
-                                            shadowRadius: 3,
-                                            elevation: 2,
-                                        }}
-                                    >
-                                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: darkMode ? '#fff' : '#333', marginBottom: 6 }}>
-                                            📌 {event.title}
-                                        </Text>
+    visible={showEventsModal}
+    animationType="slide"
+    transparent={true}
+    onRequestClose={() => setShowEventsModal(false)}
+>
+    <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>All Events</Text>
+            <ScrollView>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#4CAF50" />
+                        <Text style={{ marginTop: 10 }}>Loading events...</Text>
+                    </View>
+                ) : allEvents && allEvents.length > 0 ? (
+                    allEvents.map((event) => (
+                        <View
+                            key={event.id}
+                            style={{
+                                marginBottom: 15,
+                                padding: 15,
+                                backgroundColor: darkMode ? '#1e1e1e' : '#f9f9f9',
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: '#ccc',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 3,
+                                elevation: 2,
+                            }}
+                        >
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: darkMode ? '#fff' : '#333', marginBottom: 6 }}>
+                                📌 {event.title}
+                            </Text>
 
-                                        <Text style={{ fontSize: 14, color: darkMode ? '#ddd' : '#555', marginBottom: 10 }}>
-                                            {event.description}
-                                        </Text>
+                            <Text style={{ fontSize: 14, color: darkMode ? '#ddd' : '#555', marginBottom: 10 }}>
+                                {event.description}
+                            </Text>
 
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                            <Ionicons name="calendar-outline" size={16} color={darkMode ? '#4CAF50' : '#008000'} />
-                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-                                                {event.formattedDate || event.date}
-                                            </Text>
-                                        </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="calendar-outline" size={16} color={darkMode ? '#4CAF50' : '#008000'} />
+                                <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                    {new Date(event.event_date).toLocaleDateString() || 'No date'}
+                                </Text>
+                            </View>
 
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                            <Ionicons name="time-outline" size={16} color={darkMode ? '#FFA500' : '#ff8c00'} />
-                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-                                                {event.time || 'TBD'}
-                                            </Text>
-                                        </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="time-outline" size={16} color={darkMode ? '#FFA500' : '#ff8c00'} />
+                                <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                    {event.time || 'TBD'}
+                                </Text>
+                            </View>
 
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                            <Ionicons name="location-outline" size={16} color={darkMode ? '#87CEEB' : '#2196F3'} />
-                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-                                                {event.location || 'No location'}
-                                            </Text>
-                                        </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="location-outline" size={16} color={darkMode ? '#87CEEB' : '#2196F3'} />
+                                <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                    {event.location || 'No location'}
+                                </Text>
+                            </View>
 
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Ionicons name="information-circle-outline" size={16} color={darkMode ? '#FFB6C1' : '#e91e63'} />
-                                            <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
-                                                {event.additionalDetails || 'No additional details'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                ))
-                            ) : (
-                                <View style={styles.noEventsContainer}>
-                                    <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
-                                    <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
-                                        No events available
+                            {event.additional_details && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="information-circle-outline" size={16} color={darkMode ? '#FFB6C1' : '#e91e63'} />
+                                    <Text style={{ marginLeft: 6, color: darkMode ? '#ccc' : '#444' }}>
+                                        {event.additional_details}
                                     </Text>
                                 </View>
                             )}
-                        </ScrollView>
-
-                        <TouchableOpacity 
-                            style={styles.closeButton}
-                            onPress={() => setShowEventsModal(false)}
-                        >
-                            <Text style={styles.closeButtonText}>Close</Text>
-                        </TouchableOpacity>
+                        </View>
+                    ))
+                ) : (
+                    <View style={styles.noEventsContainer}>
+                        <Ionicons name="calendar-outline" size={40} color="#9E9E9E" />
+                        <Text style={[styles.noEventsText, darkMode ? styles.darkText : styles.lightText]}>
+                            No events available
+                        </Text>
                     </View>
-                </View>
-            </Modal>
+                )}
+            </ScrollView>
+
+            <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowEventsModal(false)}
+            >
+                <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
         </View>
+    </View>
+</Modal>       
+
+</View>
     );
 }
 
