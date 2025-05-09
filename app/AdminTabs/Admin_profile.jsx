@@ -18,24 +18,14 @@ const AdminProfile = () => {
     const [error, setError] = useState(null);
     const [totalEvents, setTotalEvents] = useState(0);
     const [eventFilter, setEventFilter] = useState('All');
-
-    // New state for reports
     const [showReports, setShowReports] = useState(false);
     const [reports, setReports] = useState([]);
     const [totalReports, setTotalReports] = useState(0);
-    
-    // New State for Participants
-    const [showParticipants, setShowParticipants] = useState(false);
-    const [participants, setParticipants] = useState([]);
-    const [selectedEventId, setSelectedEventId] = useState(null);
-    const [participantsCount, setParticipantsCount] = useState(0);
- // Saved items state
- const [savedItems, setSavedItems] = useState([]);
- const [showSaved, setShowSaved] = useState(false);
- const [totalSavedItems, setTotalSavedItems] = useState(0);
- const [selectedSavedSection, setSelectedSavedSection] = useState('events'); // 'events' or 'reports'
- 
-    // Handle Logout
+    const [savedItems, setSavedItems] = useState([]);
+    const [showSaved, setShowSaved] = useState(false);
+    const [totalSavedItems, setTotalSavedItems] = useState(0);
+    const [selectedSavedSection, setSelectedSavedSection] = useState('events');
+
     const handleLogout = async () => {
         try {
             await AsyncStorage.removeItem("userToken");
@@ -49,12 +39,10 @@ const AdminProfile = () => {
         setSettingsVisible(!settingsVisible);
     };
 
-    // Function to fetch events data from the database
     const fetchEvents = async () => {
         setLoading(true);
         setError(null);
         try {
-            console.log('Fetching events with filter:', eventFilter);
             let url = "https://backend-rt98.onrender.com/events";
             if (eventFilter === 'Created Now') {
                 const today = new Date();
@@ -66,7 +54,6 @@ const AdminProfile = () => {
                         return eventDate && isToday(eventDate);
                     });
                     
-                    // Check saved status for each event
                     const savedEvents = await AsyncStorage.getItem('savedEvents');
                     const savedEventIds = savedEvents ? JSON.parse(savedEvents).map(e => e.event_id) : [];
                     
@@ -82,7 +69,6 @@ const AdminProfile = () => {
                 Alert.alert("Filter Not Supported", "Filtering by event status is not supported by the current backend. Showing all events.");
                 const response = await axios.get(url);
                 if (response.data) {
-                    // Check saved status for each event
                     const savedEvents = await AsyncStorage.getItem('savedEvents');
                     const savedEventIds = savedEvents ? JSON.parse(savedEvents).map(e => e.event_id) : [];
                     
@@ -97,7 +83,6 @@ const AdminProfile = () => {
             } else {
                 const response = await axios.get(url);
                 if (response.data) {
-                    // Check saved status for each event
                     const savedEvents = await AsyncStorage.getItem('savedEvents');
                     const savedEventIds = savedEvents ? JSON.parse(savedEvents).map(e => e.event_id) : [];
                     
@@ -121,7 +106,6 @@ const AdminProfile = () => {
         }
     };
 
-    // Fetch events when showEvents or eventFilter changes
     useEffect(() => {
         if (showEvents) {
             fetchEvents();
@@ -132,7 +116,6 @@ const AdminProfile = () => {
         try {
             await axios.delete(`https://backend-rt98.onrender.com/events/${eventId}`);
             await fetchEvents();
-            // Also delete from savedEvents if it exists there
             const savedEvents = await AsyncStorage.getItem('savedEvents');
             if (savedEvents) {
                 const updatedSavedEvents = JSON.parse(savedEvents).filter(e => e.event_id !== eventId);
@@ -145,20 +128,19 @@ const AdminProfile = () => {
         }
     };
 
-    // Function to fetch reports
     const fetchReports = async () => {
         setLoading(true);
         setError(null);
         try {
             const response = await axios.get("https://backend-rt98.onrender.com/api/admin/report-details");
             if (response.data) {
-                // Check saved status for each report
                 const savedReports = await AsyncStorage.getItem('savedReports');
                 const savedReportIds = savedReports ? JSON.parse(savedReports).map(r => r.report_id) : [];
                 
                 const reportsWithSavedStatus = response.data.map(report => ({
                     ...report,
-                    isSaved: savedReportIds.includes(report.report_id)
+                    isSaved: savedReportIds.includes(report.report_id),
+                    isLiked: report.likedBy && report.likedBy.includes('admin-id-here') // Replace with actual admin ID
                 }));
                 
                 setReports(reportsWithSavedStatus);
@@ -181,11 +163,58 @@ const AdminProfile = () => {
         }
     }, [showReports]);
 
+    const handleLikeReport = async (reportId, reporterId) => {  // Add reporterId as parameter
+    try {
+        const userDataString = await AsyncStorage.getItem("userData");
+        if (!userDataString) {
+            Alert.alert("Error", "Please login to like reports");
+            return;
+        }
+
+        const userData = JSON.parse(userDataString);
+        
+        const response = await axios.post(
+            `https://backend-rt98.onrender.com/api/reports/${reportId}/like`,
+            {
+                reporterId: reporterId,  // Use the passed reporterId
+                adminId: userData.userId   // ID of user liking the report
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userData.token}` // If using auth
+                }
+            }
+        );
+
+        if (response.data.success) {
+            // Update UI
+            setReports(prev => prev.map(r => 
+                r._id === reportId 
+                    ? { 
+                        ...r, 
+                        likes: response.data.likes, 
+                        likedBy: [...(r.likedBy || []), userData.userId],
+                        isLiked: true
+                    }
+                    : r
+            ));
+        }
+    } catch (error) {
+        console.error("Like error:", error.response?.data || error.message);
+        
+        if (error.response?.data?.error === 'You already liked this report') {
+            Alert.alert("Info", "You've already liked this report");
+        } else {
+            Alert.alert("Error", error.response?.data?.error || "Failed to like report");
+        }
+    }
+};
+
     const deleteReport = async (reportId) => {
         try {
             await axios.delete(`https://backend-rt98.onrender.com/api/reports/${reportId}`);
             await fetchReports();
-            // Also delete from savedReports if it exists there
             const savedReports = await AsyncStorage.getItem('savedReports');
             if (savedReports) {
                 const updatedSavedReports = JSON.parse(savedReports).filter(r => r.report_id !== reportId);
@@ -198,159 +227,125 @@ const AdminProfile = () => {
         }
     };
 
-    // Function to fetch participants for a specific event
-    const fetchParticipants = async (eventId) => {
+    const fetchSavedItems = async () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get(`https://backend-rt98.onrender.com/events/${eventId}/participants`);
-            if (response.data && response.data.participants) {
-                setParticipants(response.data.participants);
-                setSelectedEventId(eventId);
-                setParticipantsCount(response.data.participants.length);
-            } else {
-                setParticipants([]);
-                setSelectedEventId(eventId);
-                setParticipantsCount(0);
-                setError('No participants found for this event.');
-            }
-            setShowParticipants(true);
+            const [savedEvents, savedReports] = await Promise.all([
+                AsyncStorage.getItem('savedEvents'),
+                AsyncStorage.getItem('savedReports')
+            ]);
+            
+            const events = savedEvents ? JSON.parse(savedEvents).map(e => ({ ...e, type: 'event' })) : [];
+            const reports = savedReports ? JSON.parse(savedReports).map(r => ({ ...r, type: 'report' })) : [];
+            
+            setSavedItems([...events, ...reports]);
+            setTotalSavedItems(events.length + reports.length);
         } catch (err) {
-            console.error("Error fetching participants:", err);
-            setError("Failed to fetch participants.");
-            Alert.alert('Error', 'Failed to fetch participants. Please try again.');
+            console.error("Error fetching saved items:", err);
+            setError("Failed to fetch saved items.");
         } finally {
             setLoading(false);
         }
     };
 
-   // Fetch all saved items
-   const fetchSavedItems = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-        const [savedEvents, savedReports] = await Promise.all([
-            AsyncStorage.getItem('savedEvents'),
-            AsyncStorage.getItem('savedReports')
-        ]);
-        
-        const events = savedEvents ? JSON.parse(savedEvents).map(e => ({ ...e, type: 'event' })) : [];
-        const reports = savedReports ? JSON.parse(savedReports).map(r => ({ ...r, type: 'report' })) : [];
-        
-        setSavedItems([...events, ...reports]);
-        setTotalSavedItems(events.length + reports.length);
-    } catch (err) {
-        console.error("Error fetching saved items:", err);
-        setError("Failed to fetch saved items.");
-    } finally {
-        setLoading(false);
-    }
-};
-
-useEffect(() => {
-    if (showSaved) {
-        fetchSavedItems();
-    }
-}, [showSaved]);
-
-// Delete saved item
-const deleteSavedItem = async (item) => {
-    try {
-        if (item.type === 'event') {
-            const savedEvents = await AsyncStorage.getItem('savedEvents');
-            if (savedEvents) {
-                const updatedEvents = JSON.parse(savedEvents).filter(e => e.event_id !== item.event_id);
-                await AsyncStorage.setItem('savedEvents', JSON.stringify(updatedEvents));
-            }
-        } else if (item.type === 'report') {
-            const savedReports = await AsyncStorage.getItem('savedReports');
-            if (savedReports) {
-                const updatedReports = JSON.parse(savedReports).filter(r => r.report_id !== item.report_id);
-                await AsyncStorage.setItem('savedReports', JSON.stringify(updatedReports));
-            }
+    useEffect(() => {
+        if (showSaved) {
+            fetchSavedItems();
         }
-        
-        await fetchSavedItems();
-        
-        // Refresh the current view if needed
-        if (showEvents) fetchEvents();
-        if (showReports) fetchReports();
-        
-        Alert.alert('Success', 'Item removed from saved');
-    } catch (error) {
-        console.error('Error deleting saved item:', error);
-        Alert.alert('Error', 'Failed to remove saved item');
-    }
-};
-// Save event
-const saveEvent = async (event) => {
-  try {
-      const isSaved = !event.isSaved;
-      const updatedEvents = events.map(e => 
-          e.event_id === event.event_id ? { ...e, isSaved } : e
-      );
-      setEvents(updatedEvents);
-      
-      const savedEvents = await AsyncStorage.getItem('savedEvents');
-      let eventsArray = savedEvents ? JSON.parse(savedEvents) : [];
-      
-      if (isSaved) {
-          eventsArray.push({
-              event_id: event.event_id,
-              event_name: event.event_name,
-              event_date: event.event_date,
-              location: event.location,
-              event_time: event.event_time
-          });
-      } else {
-          eventsArray = eventsArray.filter(e => e.event_id !== event.event_id);
-      }
-      
-      await AsyncStorage.setItem('savedEvents', JSON.stringify(eventsArray));
-      
-      if (showSaved) fetchSavedItems();
-  } catch (error) {
-      console.error('Error saving event:', error);
-      Alert.alert('Error', 'Failed to save event');
-  }
-};
+    }, [showSaved]);
 
-// Save report
-const saveReport = async (report) => {
-  try {
-      const isSaved = !report.isSaved;
-      const updatedReports = reports.map(r => 
-          r.report_id === report.report_id ? { ...r, isSaved } : r
-      );
-      setReports(updatedReports);
-      
-      const savedReports = await AsyncStorage.getItem('savedReports');
-      let reportsArray = savedReports ? JSON.parse(savedReports) : [];
-      
-      if (isSaved) {
-          reportsArray.push({
-              report_id: report.report_id,
-              full_name: report.full_name,
-              description: report.description,
-              timestamp: report.timestamp,
-              latitude: report.latitude,
-              longitude: report.longitude
-          });
-      } else {
-          reportsArray = reportsArray.filter(r => r.report_id !== report.report_id);
-      }
-      
-      await AsyncStorage.setItem('savedReports', JSON.stringify(reportsArray));
-      
-      if (showSaved) fetchSavedItems();
-  } catch (error) {
-      console.error('Error saving report:', error);
-      Alert.alert('Error', 'Failed to save report');
-  }
-};
+    const deleteSavedItem = async (item) => {
+        try {
+            if (item.type === 'event') {
+                const savedEvents = await AsyncStorage.getItem('savedEvents');
+                if (savedEvents) {
+                    const updatedEvents = JSON.parse(savedEvents).filter(e => e.event_id !== item.event_id);
+                    await AsyncStorage.setItem('savedEvents', JSON.stringify(updatedEvents));
+                }
+            } else if (item.type === 'report') {
+                const savedReports = await AsyncStorage.getItem('savedReports');
+                if (savedReports) {
+                    const updatedReports = JSON.parse(savedReports).filter(r => r.report_id !== item.report_id);
+                    await AsyncStorage.setItem('savedReports', JSON.stringify(updatedReports));
+                }
+            }
+            
+            await fetchSavedItems();
+            
+            if (showEvents) fetchEvents();
+            if (showReports) fetchReports();
+            
+            Alert.alert('Success', 'Item removed from saved');
+        } catch (error) {
+            console.error('Error deleting saved item:', error);
+            Alert.alert('Error', 'Failed to remove saved item');
+        }
+    };
 
-    const saveParticipant = (participant) => {
-        Alert.alert('Info', 'Saving participants is not implemented in this version.');
+    const saveEvent = async (event) => {
+        try {
+            const isSaved = !event.isSaved;
+            const updatedEvents = events.map(e => 
+                e.event_id === event.event_id ? { ...e, isSaved } : e
+            );
+            setEvents(updatedEvents);
+            
+            const savedEvents = await AsyncStorage.getItem('savedEvents');
+            let eventsArray = savedEvents ? JSON.parse(savedEvents) : [];
+            
+            if (isSaved) {
+                eventsArray.push({
+                    event_id: event.event_id,
+                    event_name: event.event_name,
+                    event_date: event.event_date,
+                    location: event.location,
+                    event_time: event.event_time
+                });
+            } else {
+                eventsArray = eventsArray.filter(e => e.event_id !== event.event_id);
+            }
+            
+            await AsyncStorage.setItem('savedEvents', JSON.stringify(eventsArray));
+            
+            if (showSaved) fetchSavedItems();
+        } catch (error) {
+            console.error('Error saving event:', error);
+            Alert.alert('Error', 'Failed to save event');
+        }
+    };
+
+    const saveReport = async (report) => {
+        try {
+            const isSaved = !report.isSaved;
+            const updatedReports = reports.map(r => 
+                r.report_id === report.report_id ? { ...r, isSaved } : r
+            );
+            setReports(updatedReports);
+            
+            const savedReports = await AsyncStorage.getItem('savedReports');
+            let reportsArray = savedReports ? JSON.parse(savedReports) : [];
+            
+            if (isSaved) {
+                reportsArray.push({
+                    report_id: report.report_id,
+                    full_name: report.full_name,
+                    description: report.description,
+                    timestamp: report.timestamp,
+                    latitude: report.latitude,
+                    longitude: report.longitude
+                });
+            } else {
+                reportsArray = reportsArray.filter(r => r.report_id !== report.report_id);
+            }
+            
+            await AsyncStorage.setItem('savedReports', JSON.stringify(reportsArray));
+            
+            if (showSaved) fetchSavedItems();
+        } catch (error) {
+            console.error('Error saving report:', error);
+            Alert.alert('Error', 'Failed to save report');
+        }
     };
 
     return (
@@ -396,9 +391,7 @@ const saveReport = async (report) => {
                             size={80}
                             color={darkMode ? "#D1D5DB" : "#9CA3AF"}
                         />
-                        <View style={styles.editIcon}>
-                            <Ionicons name="pencil" size={16} color="white" />
-                        </View>
+                       
                     </TouchableOpacity>
                     <Text style={styles.userName}>
                         Admin User
@@ -409,73 +402,56 @@ const saveReport = async (report) => {
                 </View>
 
                 {/* Features Grid */}
-                <View style={styles.featuresGrid}>
-                    <TouchableOpacity
-                        style={[
-                            styles.featureItem,
-                            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
-                        ]}
-                        onPress={() => setShowEvents(!showEvents)}
-                    >
-                        <View style={styles.featureIconContainer}>
-                            <Ionicons name="calendar" size={28} color="#68D391" />
-                        </View>
-                        <Text style={styles.featureText}>
-                            Events
-                        </Text>
-                    </TouchableOpacity>
+               {/* Features Grid */}
+<View style={styles.featuresGrid}>
+    <TouchableOpacity
+        style={[
+            styles.featureItem,
+            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
+        ]}
+        onPress={() => setShowEvents(!showEvents)}
+    >
+        <View style={styles.featureIconContainer}>
+            <Ionicons name="calendar" size={28} color="#68D391" />
+        </View>
+        <Text style={styles.featureText}>
+            Events
+        </Text>
+    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[
-                            styles.featureItem,
-                            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
-                        ]}
-                        onPress={() => setShowReports(!showReports)}
-                    >
-                        <View style={styles.featureIconContainer}>
-                            <Ionicons name="document-text" size={28} color="#4299E1" />
-                        </View>
-                        <Text style={styles.featureText}>
-                            Reports
-                        </Text>
-                    </TouchableOpacity>
+    <TouchableOpacity
+        style={[
+            styles.featureItem,
+            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
+        ]}
+        onPress={() => setShowReports(!showReports)}
+    >
+        <View style={styles.featureIconContainer}>
+            <Ionicons name="document-text" size={28} color="#4299E1" />
+        </View>
+        <Text style={styles.featureText}>
+            Reports
+        </Text>
+    </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[
-                            styles.featureItem,
-                            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
-                        ]}
-                        onPress={() => {
-                            const eventId = 1;
-                            fetchParticipants(eventId);
-                        }}
-                    >
-                        <View style={styles.featureIconContainer}>
-                            <Ionicons name="people-outline" size={28} color="#805AD5" />
-                        </View>
-                        <Text style={styles.featureText}>
-                            Participants
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.featureItem,
-                            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
-                        ]}
-                        onPress={() => setShowSaved(!showSaved)}
-                    >
-                        <View style={styles.featureIconContainer}>
-                            <Ionicons name="albums-outline" size={28} color="#ED8936" />
-                        </View>
-                        <Text style={styles.featureText}>
-                            Saved
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+    <TouchableOpacity
+        style={[
+            styles.featureItem,
+            darkMode ? styles.darkFeatureItem : styles.lightFeatureItem,
+        ]}
+        onPress={() => setShowSaved(!showSaved)}
+    >
+        <View style={styles.featureIconContainer}>
+            <Ionicons name="albums-outline" size={28} color="#ED8936" />
+        </View>
+        <Text style={styles.featureText}>
+            Saved
+        </Text>
+    </TouchableOpacity>
+</View>
             </ScrollView>
 
-            {/* Conditionally render Events list */}
+            {/* Events List */}
             {showEvents && (
                 <View style={styles.eventsContainer}>
                     <View style={styles.eventsHeader}>
@@ -569,7 +545,7 @@ const saveReport = async (report) => {
                 </View>
             )}
 
-            {/* Conditionally render Reports list */}
+            {/* Reports List */}
             {showReports && (
                 <View style={styles.eventsContainer}>
                     <View style={styles.eventsHeader}>
@@ -614,6 +590,20 @@ const saveReport = async (report) => {
                                                 </View>
                                             )}
                                         </View>
+                                        
+                                        {/* Like Button */}
+                                        <TouchableOpacity 
+                                            onPress={() => handleLikeReport(report.report_id, report.userId)}
+                                            style={styles.likeButton}
+                                        >
+                                            <Ionicons 
+                                                name={report.isLiked ? "heart" : "heart-outline"} 
+                                                size={24} 
+                                                color={report.isLiked ? "#ff6b6b" : "#555"} 
+                                            />
+                                            <Text style={styles.likeCount}>{report.likes || 0}</Text>
+                                        </TouchableOpacity>
+                                        
                                         <TouchableOpacity onPress={() => saveReport(report)}>
                                             {report.isSaved ? (
                                                 <View style={{ alignItems: 'center' }}>
@@ -652,160 +642,114 @@ const saveReport = async (report) => {
                 </View>
             )}
 
-            {/* Conditionally render Participants list */}
-            {showParticipants && (
+            {/* Saved Items */}
+            {showSaved && (
                 <View style={styles.eventsContainer}>
                     <View style={styles.eventsHeader}>
-                        <Text style={styles.eventsTitle}>Participants</Text>
-                        <TouchableOpacity onPress={() => setShowParticipants(false)} style={styles.closeButton}>
+                        <Text style={styles.eventsTitle}>Saved Items</Text>
+                        <TouchableOpacity onPress={() => setShowSaved(false)} style={styles.closeButton}>
                             <Ionicons name="close-outline" size={30} color="#555" />
                         </TouchableOpacity>
                     </View>
+
                     {loading ? (
-                        <Text>Loading participants...</Text>
+                        <Text>Loading...</Text>
                     ) : error ? (
                         <Text>Error: {error}</Text>
                     ) : (
                         <>
                             <View style={styles.summaryCards}>
                                 <View style={[styles.summaryCard, styles.totalCard]}>
-                                    <Text style={styles.summaryCount}>{participantsCount}</Text>
-                                    <Text style={styles.summaryLabel}>Total Participants</Text>
+                                    <Text style={styles.summaryCount}>{totalSavedItems}</Text>
+                                    <Text style={styles.summaryLabel}>Total Saved</Text>
                                 </View>
                             </View>
+
+                            <View style={styles.savedToggleContainer}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.savedToggleButton,
+                                        selectedSavedSection === 'events' && styles.savedToggleButtonActive
+                                    ]}
+                                    onPress={() => setSelectedSavedSection('events')}
+                                >
+                                    <Text style={[
+                                        styles.savedToggleText,
+                                        selectedSavedSection === 'events' && styles.savedToggleTextActive
+                                    ]}>
+                                        Events
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.savedToggleButton,
+                                        selectedSavedSection === 'reports' && styles.savedToggleButtonActive
+                                    ]}
+                                    onPress={() => setSelectedSavedSection('reports')}
+                                >
+                                    <Text style={[
+                                        styles.savedToggleText,
+                                        selectedSavedSection === 'reports' && styles.savedToggleTextActive
+                                    ]}>
+                                        Reports
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
                             <ScrollView style={styles.eventsList}>
-                                {participants.length > 0 ? (
-                                    participants.map((participant) => (
-                                        <View key={participant.user_id} style={styles.eventListItem}>
-                                            <View style={styles.eventIcon}>
-                                                <Ionicons name="person-outline" size={20} color="#fff" />
+                                {selectedSavedSection === 'events' ? (
+                                    savedItems.filter(item => item.type === 'event').length > 0 ? (
+                                        savedItems.filter(item => item.type === 'event').map(item => (
+                                            <View key={`event_${item.event_id}`} style={styles.eventListItem}>
+                                                <View style={styles.eventIcon}>
+                                                    <Ionicons name="calendar-outline" size={20} color="#fff" />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.eventTitle}>{item.event_name}</Text>
+                                                    <Text style={styles.eventDate}>
+                                                        {item.event_date ? format(new Date(item.event_date), 'PPP') : 'N/A'}
+                                                        {item.event_time && ` • ${item.event_time}`}
+                                                    </Text>
+                                                    <Text style={styles.eventLocation}>{item.location}</Text>
+                                                </View>
+                                                <TouchableOpacity onPress={() => deleteSavedItem(item)}>
+                                                    <Ionicons name="trash-outline" size={24} color="#dc3545" />
+                                                </TouchableOpacity>
                                             </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={styles.eventTitle}>{participant.name}</Text>
-                                                <Text style={styles.eventDate}>Email: {participant.email}</Text>
-                                                <Text style={styles.eventLocation}>Joined At: {format(new Date(participant.joined_at), 'PPPpp')}</Text>
-                                            </View>
-                                            <TouchableOpacity onPress={() => saveParticipant(participant)}>
-                                                <Ionicons name="bookmark-outline" size={24} color="#ED8936" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    ))
+                                        ))
+                                    ) : (
+                                        <Text style={styles.noItemsText}>No saved events found</Text>
+                                    )
                                 ) : (
-                                    <Text>No participants found for this event.</Text>
+                                    savedItems.filter(item => item.type === 'report').length > 0 ? (
+                                        savedItems.filter(item => item.type === 'report').map(item => (
+                                            <View key={`report_${item.report_id}`} style={styles.eventListItem}>
+                                                <View style={styles.eventIcon}>
+                                                    <Ionicons name="document-text" size={20} color="#fff" />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.eventTitle}>Report #{item.report_id}</Text>
+                                                    <Text style={styles.eventDate}>
+                                                        {item.timestamp ? format(new Date(item.timestamp), 'PPPpp') : 'N/A'}
+                                                    </Text>
+                                                    <Text style={styles.eventLocation}>By: {item.full_name || 'Unknown'}</Text>
+                                                    <Text style={styles.eventDescription}>{item.description}</Text>
+                                                </View>
+                                                <TouchableOpacity onPress={() => deleteSavedItem(item)}>
+                                                    <Ionicons name="trash-outline" size={24} color="#dc3545" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))
+                                    ) : (
+                                        <Text style={styles.noItemsText}>No saved reports found</Text>
+                                    )
                                 )}
                             </ScrollView>
                         </>
                     )}
                 </View>
             )}
-{/* Updated Saved Items section */}
-{showSaved && (
-                    <View style={styles.eventsContainer}>
-                        <View style={styles.eventsHeader}>
-                            <Text style={styles.eventsTitle}>Saved Items</Text>
-                            <TouchableOpacity onPress={() => setShowSaved(false)} style={styles.closeButton}>
-                                <Ionicons name="close-outline" size={30} color="#555" />
-                            </TouchableOpacity>
-                        </View>
 
-                        {loading ? (
-                            <Text>Loading...</Text>
-                        ) : error ? (
-                            <Text>Error: {error}</Text>
-                        ) : (
-                            <>
-                                <View style={styles.summaryCards}>
-                                    <View style={[styles.summaryCard, styles.totalCard]}>
-                                        <Text style={styles.summaryCount}>{totalSavedItems}</Text>
-                                        <Text style={styles.summaryLabel}>Total Saved</Text>
-                                    </View>
-                                </View>
-
-                                {/* Toggle buttons */}
-                                <View style={styles.savedToggleContainer}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.savedToggleButton,
-                                            selectedSavedSection === 'events' && styles.savedToggleButtonActive
-                                        ]}
-                                        onPress={() => setSelectedSavedSection('events')}
-                                    >
-                                        <Text style={[
-                                            styles.savedToggleText,
-                                            selectedSavedSection === 'events' && styles.savedToggleTextActive
-                                        ]}>
-                                            Events
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.savedToggleButton,
-                                            selectedSavedSection === 'reports' && styles.savedToggleButtonActive
-                                        ]}
-                                        onPress={() => setSelectedSavedSection('reports')}
-                                    >
-                                        <Text style={[
-                                            styles.savedToggleText,
-                                            selectedSavedSection === 'reports' && styles.savedToggleTextActive
-                                        ]}>
-                                            Reports
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <ScrollView style={styles.eventsList}>
-                                    {selectedSavedSection === 'events' ? (
-                                        savedItems.filter(item => item.type === 'event').length > 0 ? (
-                                            savedItems.filter(item => item.type === 'event').map(item => (
-                                                <View key={`event_${item.event_id}`} style={styles.eventListItem}>
-                                                    <View style={styles.eventIcon}>
-                                                        <Ionicons name="calendar-outline" size={20} color="#fff" />
-                                                    </View>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.eventTitle}>{item.event_name}</Text>
-                                                        <Text style={styles.eventDate}>
-                                                            {item.event_date ? format(new Date(item.event_date), 'PPP') : 'N/A'}
-                                                            {item.event_time && ` • ${item.event_time}`}
-                                                        </Text>
-                                                        <Text style={styles.eventLocation}>{item.location}</Text>
-                                                    </View>
-                                                    <TouchableOpacity onPress={() => deleteSavedItem(item)}>
-                                                        <Ionicons name="trash-outline" size={24} color="#dc3545" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={styles.noItemsText}>No saved events found</Text>
-                                        )
-                                    ) : (
-                                        savedItems.filter(item => item.type === 'report').length > 0 ? (
-                                            savedItems.filter(item => item.type === 'report').map(item => (
-                                                <View key={`report_${item.report_id}`} style={styles.eventListItem}>
-                                                    <View style={styles.eventIcon}>
-                                                        <Ionicons name="document-text" size={20} color="#fff" />
-                                                    </View>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.eventTitle}>Report #{item.report_id}</Text>
-                                                        <Text style={styles.eventDate}>
-                                                            {item.timestamp ? format(new Date(item.timestamp), 'PPPpp') : 'N/A'}
-                                                        </Text>
-                                                        <Text style={styles.eventLocation}>By: {item.full_name || 'Unknown'}</Text>
-                                                        <Text style={styles.eventDescription}>{item.description}</Text>
-                                                    </View>
-                                                    <TouchableOpacity onPress={() => deleteSavedItem(item)}>
-                                                        <Ionicons name="trash-outline" size={24} color="#dc3545" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={styles.noItemsText}>No saved reports found</Text>
-                                        )
-                                    )}
-                                </ScrollView>
-                            </>
-                        )}
-                    </View>
-                )}
             {/* Settings Modal */}
             {settingsVisible && (
                 <View style={styles.settingsOverlay}>
@@ -894,22 +838,28 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     userRole: {
-        fontSize: 16,
+        fontSize: 30,
         color: '#718096',
     },
     featuresGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        width: '100%',
         marginBottom: 20,
     },
     featureItem: {
-        width: '48%',
-        aspectRatio: 1,
+        width: '100%',
+        height: 100,
         borderRadius: 12,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 15,
+        paddingHorizontal: 25,
+        marginBottom: 20,
+    },
+    centeredFeatureItem: {
+        marginLeft: 'auto',
+        marginRight: 'auto',
+    },
+    featureItemSpacer: {
+        width: '48%',
     },
     darkFeatureItem: {
         backgroundColor: '#2D3748',
@@ -918,16 +868,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#EDF2F7',
     },
     featureIconContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
         backgroundColor: 'white',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 10,
+        marginRight: 15,
     },
     featureText: {
-        fontSize: 16,
+        fontSize: 25,
         fontWeight: '500',
     },
     eventsContainer: {
@@ -965,7 +915,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     totalCard: {
-        backgroundColor: '#E6FFFA',
+        backgroundColor: '#F0FFF4',  // Light green
+        borderLeftWidth: 4,
+        borderLeftColor: '#38A169'  // Accent green border
     },
     summaryCount: {
         fontSize: 24,
@@ -1041,6 +993,17 @@ const styles = StyleSheet.create({
     deleteButton: {
         marginLeft: 10,
     },
+    likeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 10,
+        padding: 5,
+    },
+    likeCount: {
+        marginLeft: 5,
+        fontSize: 14,
+        color: '#555',
+    },
     settingsOverlay: {
         position: 'absolute',
         top: 0,
@@ -1080,19 +1043,26 @@ const styles = StyleSheet.create({
         fontSize: 18,
     },
     savedToggleContainer: {
+        alignSelf: 'center',
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 13,
+        paddingVertical: 10,
         marginBottom: 15,
         borderRadius: 8,
-        overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#CBD5E0',
+        backgroundColor: '#fff',
     },
     savedToggleButton: {
-        flex: 1,
-        paddingVertical: 12,
+        paddingVertical: 15,
+        paddingHorizontal: 40,
         alignItems: 'center',
         backgroundColor: '#EDF2F7',
+        borderRadius: 5,
+        marginHorizontal: 20,
+        marginRight: 10,
     },
     savedToggleButtonActive: {
         backgroundColor: '#3182CE',

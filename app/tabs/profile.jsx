@@ -10,8 +10,8 @@ import {
     Dimensions,
     Animated,
     Easing,
-    ActivityIndicator, // Import ActivityIndicator
-    Alert, // Import Alert
+    ActivityIndicator,
+    Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,9 +19,27 @@ import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../context/ThemeContext";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { SafeAreaView } from 'react-native-safe-area-context';
+const axios = require('axios');
+
+// Import your avatar border images
+import borderDefault from '../../assets/images/border_default.png';
+import borderFire from '../../assets/images/border_fire.png';
+import borderCool from '../../assets/images/border_cool.png';
+import borderInsane from '../../assets/images/border_insane.png';
+import borderCloud from '../../assets/images/border_cloud.png';
+import borderHappy from '../../assets/images/border_happy.png';
 
 const APP_VERSION = "1.0.0";
 const { width, height } = Dimensions.get("window");
+
+const avatarBorderOptions = [
+    { name: 'Default', source: borderDefault },
+    { name: 'Hot', source: borderFire },
+    { name: 'Cool', source: borderCool },
+    { name: 'Leaf', source: borderInsane },
+    { name: 'Cloud', source: borderCloud },
+    { name: 'Happy', source: borderHappy },
+];
 
 const ProfileScreen = () => {
     const router = useRouter();
@@ -32,13 +50,20 @@ const ProfileScreen = () => {
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [profilePicture, setProfilePicture] = useState(null);
+    const [selectedBorderIndex, setSelectedBorderIndex] = useState(0);
     const rotationAnim = useRef(new Animated.Value(0)).current;
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [iconRotation, setIconRotation] = useState(0);
     const switchRotationAnim = useRef(new Animated.Value(0)).current;
-    const [labelText, setLabelText] = useState("Dark Mode");
     const [reportImages, setReportImages] = useState([]);
-    const [loadingImages, setLoadingImages] = useState(false); // New state for loading indicator
+    const [loadingImages, setLoadingImages] = useState(false);
+    // In ProfileScreen.js
+const [profileSettings, setProfileSettings] = useState({
+    profilePicture: null,
+    selectedBorderIndex: 0,
+    iconName: 'user-circle',
+    iconSource: null
+});
 
     useEffect(() => {
         Animated.timing(rotationAnim, {
@@ -49,12 +74,24 @@ const ProfileScreen = () => {
         }).start();
 
         fetchUserData();
-        fetchReportImages();
+        loadProfileSettings();
     }, [isSettingsOpen]);
 
-    useEffect(() => {
-        setLabelText(darkMode ? "Dark Mode" : "Light Mode");
-    }, [darkMode]);
+    const loadProfileSettings = async () => {
+        try {
+            const savedBorderIndex = await AsyncStorage.getItem('selectedBorderIndex');
+            const savedProfilePicture = await AsyncStorage.getItem('profilePicture');
+            
+            if (savedBorderIndex !== null) {
+                setSelectedBorderIndex(parseInt(savedBorderIndex, 10));
+            }
+            if (savedProfilePicture !== null) {
+                setProfilePicture(savedProfilePicture);
+            }
+        } catch (error) {
+            console.error("Error loading profile settings:", error);
+        }
+    };
 
     const fetchUserData = async () => {
         try {
@@ -68,6 +105,8 @@ const ProfileScreen = () => {
                 if (userData.profilePicture) {
                     setProfilePicture(userData.profilePicture);
                 }
+
+                fetchUserStats(userData.userId);
             } else {
                 console.log("No user data found in AsyncStorage");
             }
@@ -76,25 +115,22 @@ const ProfileScreen = () => {
         }
     };
 
-    const fetchReportImages = async () => {
-        setLoadingImages(true); // Start loading
+    const fetchUserStats = async (userId) => {
         try {
-            const reportsDataString = await AsyncStorage.getItem("reports");
-            if (reportsDataString) {
-                const reports = JSON.parse(reportsDataString);
-                const images = reports.flatMap(report => report.images || []);
-                setReportImages(images);
-                setReportCount(reports.length);
-            } else {
-                console.log("No reports found in AsyncStorage");
-            }
+          const response = await fetch(`https://backend-rt98.onrender.com/api/user/stats/${userId}`);
+          if (!response.ok) {
+            console.log("Failed with status:", response.status);
+            throw new Error('Failed to fetch user stats');
+          }
+      
+          const data = await response.json();
+          console.log("Fetched stats:", data);
+          setReportCount(data.reportCount);
+          setEventCount(data.eventCount);
         } catch (error) {
-            console.error("Failed to fetch report images:", error);
-            Alert.alert("Error", "Failed to load report images. Please try again later."); // User feedback
-        } finally {
-            setLoadingImages(false); // Stop loading
+          console.error("Failed to fetch user stats", error);
         }
-    };
+    };    
 
     const animatedStyle = {
         transform: [
@@ -124,7 +160,14 @@ const ProfileScreen = () => {
     };
 
     const handleEditProfile = () => {
-        router.push("/EditProfileScreen");
+        router.push({
+            pathname: "/EditProfileScreen",
+            params: {
+                firstName,
+                lastName,
+                profilePicture
+            }
+        });
     };
 
     const handleImageSelect = async () => {
@@ -174,6 +217,32 @@ const ProfileScreen = () => {
         ],
     };
 
+    const getAvatarBorderStyle = () => {
+        const baseStyle = {
+            ...StyleSheet.absoluteFillObject,
+            borderRadius: 60,
+        };
+
+        const selectedBorder = avatarBorderOptions[selectedBorderIndex]?.source;
+        const isCloudOrHappy = (selectedBorder === borderCloud || selectedBorder === borderHappy);
+
+        if (isCloudOrHappy) {
+            return {
+                ...baseStyle,
+                width: 140,
+                height: 140,
+                left: -10,
+                top: -10,
+            };
+        } else {
+            return {
+                ...baseStyle,
+                width: 120,
+                height: 120,
+            };
+        }
+    };
+
     return (
         <View style={{ flex: 1 }}>
             <Image
@@ -201,7 +270,21 @@ const ProfileScreen = () => {
                         {/* Header */}
                         <View style={styles.headerBar}>
                             <View style={styles.headerLeftContainer}>
-                                {/* */}
+                                <TouchableOpacity 
+                                    style={styles.darkModeToggle}
+                                    onPress={handleToggleDarkMode}
+                                >
+                                    <Animated.View style={switchIconAnimatedStyle}>
+                                        {darkMode ? (
+                                            <Icon name="moon-o" size={24} color="#fff" />
+                                        ) : (
+                                            <Icon name="sun-o" size={24} color="#333" />
+                                        )}
+                                    </Animated.View>
+                                    <Text style={[styles.modeLabel, darkMode ? styles.darkText : styles.lightText]}>
+                                        {darkMode ? "Night Mode" : "Light Mode"}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                             <View style={styles.headerRightContainer}>
                                 <TouchableOpacity style={styles.settingsIcon} onPress={toggleSettings}>
@@ -218,10 +301,26 @@ const ProfileScreen = () => {
                         <TouchableOpacity onPress={handleImageSelect}>
                             <View style={styles.profileIconWrapper}>
                                 {profilePicture ? (
-                                    <Image source={{ uri: profilePicture }} style={styles.profileIcon} />
+                                    <>
+                                        <Image source={{ uri: profilePicture }} style={styles.profileIcon} />
+                                        {avatarBorderOptions[selectedBorderIndex]?.source && (
+                                            <Image
+                                                source={avatarBorderOptions[selectedBorderIndex].source}
+                                                style={[styles.avatarBorderImage, getAvatarBorderStyle()]}
+                                                resizeMode="contain"
+                                            />
+                                        )}
+                                    </>
                                 ) : (
                                     <View style={styles.profileIconPlaceholder}>
                                         <Icon name="user-circle" size={80} color={darkMode ? "#ddd" : "#777"} />
+                                        {avatarBorderOptions[selectedBorderIndex]?.source && (
+                                            <Image
+                                                source={avatarBorderOptions[selectedBorderIndex].source}
+                                                style={[styles.avatarBorderImage, getAvatarBorderStyle()]}
+                                                resizeMode="contain"
+                                            />
+                                        )}
                                     </View>
                                 )}
                                 <View style={styles.editIconContainer}>
@@ -271,41 +370,6 @@ const ProfileScreen = () => {
                         <Text style={[styles.reportsHistoryTitle, darkMode ? styles.darkText : styles.lightText]}>
                             Reports History
                         </Text>
-                        {loadingImages ? ( // Show loading indicator
-                            <View style={{ padding: 20 }}>
-                                <ActivityIndicator size="large" color={darkMode ? "#fff" : "#333"} />
-                            </View>
-                        ) : (
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                <View style={styles.placeholdersContainer}>
-                                    {reportImages.length > 0 ? (
-                                        reportImages.map((image, i) => (
-                                            <View key={i} style={styles.imageBox}>
-                                                <Image
-                                                    source={{ uri: image }}
-                                                    style={styles.reportImage}
-                                                    resizeMode="cover"
-                                                    onError={() => {
-                                                        // Handle image loading errors
-                                                        console.error(`Failed to load image at ${image}`);
-                                                        // You could set a state to show a placeholder image
-                                                        // setReportImages(prevImages => {
-                                                        //   const newImages = [...prevImages];
-                                                        //   newImages[i] = 'placeholder_url'; // Replace with your placeholder
-                                                        //   return newImages;
-                                                        // });
-                                                    }}
-                                                />
-                                            </View>
-                                        ))
-                                    ) : (
-                                        Array.from({ length: 5 }).map((_, i) => (
-                                            <View key={i} style={styles.placeholderBox} />
-                                        ))
-                                    )}
-                                </View>
-                            </ScrollView>
-                        )}
                     </View>
                 </ScrollView>
             </TouchableWithoutFeedback>
@@ -320,22 +384,6 @@ const ProfileScreen = () => {
                     <Text style={[styles.settingsTitle, darkMode ? styles.darkText : styles.lightText]}>
                         Settings
                     </Text>
-                    <View style={styles.darkModeContainerSettings}>
-                        <Text style={[styles.label, darkMode ? styles.darkText : styles.lightText]}>
-                            {labelText}
-                        </Text>
-                        <TouchableOpacity onPress={handleToggleDarkMode}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Animated.View style={switchIconAnimatedStyle}>
-                                    {darkMode ? (
-                                        <Icon name="moon-o" size={24} color="#fff" />
-                                    ) : (
-                                        <Icon name="sun-o" size={24} color="#333" />
-                                    )}
-                                </Animated.View>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
                     <TouchableOpacity style={styles.optionButton} onPress={handleLogout}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Icon name="sign-out" size={20} color="red" style={{ marginRight: 5 }} />
@@ -372,13 +420,23 @@ const styles = StyleSheet.create({
     },
     headerLeftContainer: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center'
     },
-    darkModeContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginRight: 10
+    darkModeToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
     },
-    settingsIcon: { padding: 5, zIndex: 1000 },
+    modeLabel: {
+        marginLeft: 8,
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    settingsIcon: { 
+        padding: 5, 
+        zIndex: 1000 
+    },
     profileContainer: {
         alignItems: "center",
         marginTop: 30,
@@ -387,6 +445,8 @@ const styles = StyleSheet.create({
     },
     profileIconWrapper: {
         position: "relative",
+        width: 120,
+        height: 120,
     },
     profileIconPlaceholder: {
         width: 120,
@@ -402,6 +462,10 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 60,
         marginBottom: 15,
+    },
+    avatarBorderImage: {
+        position: 'absolute',
+        zIndex: -1,
     },
     title: {
         fontSize: 28,
@@ -555,12 +619,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3
-    },
-    darkModeContainerSettings: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: 'space-between',
-        paddingVertical: 10,
     },
     versionTextSettings: {
         fontSize: 14,

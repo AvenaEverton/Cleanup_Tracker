@@ -79,7 +79,7 @@ const AdminUsers = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Fetching Users...</Text>
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   panelTitle: {
-    fontSize: 20,
+    fontSize: 30,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 15,
