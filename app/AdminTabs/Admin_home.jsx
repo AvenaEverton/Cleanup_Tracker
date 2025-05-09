@@ -17,6 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BarChart } from 'react-native-chart-kit'; // Import BarChart
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import moment from 'moment'; // For timestamp formatting
+import AdminMapReports from "./AdminMapReports";
+import axios from 'axios';
+import { PieChart } from 'react-native-chart-kit';
+
+
+
 
 
 
@@ -32,6 +38,14 @@ async function fetchAddress(lat, lon) {
         return 'Failed to load address'
     }
 }
+
+function extractStreetName(address) {
+  // Example: 'Burgos St, Brgy. 123, San Juan, Metro Manila, Philippines'
+  if (!address) return null;
+  const parts = address.split(',');
+  return parts[0]?.trim(); // Return only the first part (street)
+}
+
 
 
 
@@ -55,6 +69,21 @@ const AdminHome = () => {
     const [modalVisible, setModalVisible] = useState(false);
 
     const [address, setAddress] = useState('Loading address…');
+    const [streetReportCounts, setStreetReportCounts] = useState({});
+    const [mostReportedStreet, setMostReportedStreet] = useState(null);
+    const [showMapView, setShowMapView] = useState(false);
+
+
+    useEffect(() => {
+        axios
+        .get("https://backend-rt98.onrender.com/api/admin/report-details")
+        .then((response) => setReportsData(response.data)) // ✅ Fixed the function name
+        .catch((error) =>
+            console.error("Error fetching reports:", error)
+        );
+    }, []);
+  
+
 
     // Define scoreboardColors here
     const scoreboardColors = [
@@ -114,15 +143,41 @@ const AdminHome = () => {
     };
 
     const fetchReportsData = async () => {
-        try {
-            const response = await fetch("https://backend-rt98.onrender.com/api/admin/report-details"); // Changed URL
-            const data = await response.json();
-            console.log("Reports data from backend:", data);
-            setReportsData(data);
-        } catch (error) {
-            console.error("Error fetching reports data:", error);
+      try {
+        const res = await fetch("https://backend-rt98.onrender.com/api/admin/report-details");
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+    
+        const streetCounts = {};
+        const enrichedReports = [];
+    
+        for (const report of data) {
+          const address = await fetchAddress(report.latitude, report.longitude);
+          const street = extractStreetName(address);
+    
+          if (street) {
+            streetCounts[street] = (streetCounts[street] || 0) + 1;
+          }
+    
+          enrichedReports.push({
+            ...report,
+            street: street || 'Unknown Street',
+          });
         }
+    
+        const sorted = Object.entries(streetCounts).sort((a, b) => b[1] - a[1]);
+        const mostReported = sorted[0] ? { name: sorted[0][0], count: sorted[0][1] } : null;
+    
+        setStreetReportCounts(streetCounts);
+        setMostReportedStreet(mostReported);
+        setReportsData(enrichedReports);
+      } catch (e) {
+        console.error(e);
+      }
     };
+    
+    
+    
 
     const fetchRecentEvents = async () => {
         try {
@@ -199,252 +254,272 @@ const AdminHome = () => {
 
     return (
         <View style={styles.scrollContainer}>
+            {/* View Reports Map Button - positioned at bottom right */}
+            {!showMapView && (
+                <View style={styles.floatingButtonContainer}>
+                    <TouchableOpacity
+                        onPress={() => setShowMapView(true)}
+                        style={styles.mapToggleButton}
+                    >
+                        <Text style={styles.mapToggleButtonText}>View Reports Map</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+    
+            {/* Back to Dashboard Button - remains unchanged */}
+            {showMapView && (
+                <View style={styles.backButtonContainer}>
+                    <TouchableOpacity
+                        onPress={() => setShowMapView(false)}
+                        style={styles.mapToggleButton}
+                    >
+                        <Text style={styles.mapToggleButtonText}>Back to Dashboard</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+     
+      
+     {showMapView ? (
+            <AdminMapReports reportData={reportsData} />
+        ) : (
             <ScrollView contentContainerStyle={styles.container}>
-                {/* Header */}
-                <View style={styles.headerContainer}>
-                    <Text style={styles.headerTitle}>Dashboard</Text>
-                </View>
-
-                <View style={styles.scoreboardGrid}>
-                    {Object.keys(dashboardData).slice(0, 4).map((key, index) => (
-                        <TouchableOpacity
-                            key={`${key}-${index}`} // fixed key
-                            style={[
-                                styles.scoreboardButton,
-                                styles[`scoreboardButton${index + 1}`],
-                                hoveredIndex === index && styles.scoreboardButtonHovered,
-                            ]}
-                            onPressIn={() => setHoveredIndex(index)}
-                            onPressOut={() => setHoveredIndex(null)}
-
-                            onPress={() => handleScoreboardClick(index)}
-                            disabled={index !== 0 && index !== 1 && index !== 3} // Enable click for Users, Events, and Reports
-                        >
-                            <LinearGradient
-                                colors={[scoreboardColors[index].primary, scoreboardColors[index].secondary]}
-                                style={styles.scoreboardButtonGradient}
-                            >
-                                {hoveredIndex === index && (
-                                    <Animated.View style={[styles.shine, getShineTransform()]} />
-                                )}
-                                <View style={styles.scoreboardIconContainer}>
-                                    <FontAwesome5
-                                        name={
-                                            index === 0 ? "users" : // Users
-                                                index === 1 ? "calendar-alt" : // Events
-                                                    index === 2 ? "hourglass-half" : // Pending
-                                                        "file-alt" // Reports
-                                        }
-                                        size={isWideScreen ? 40 : 24}
-                                        color="#FFFFFF"
-                                    />
-                                </View>
-                                <Text style={[styles.scoreboardText, isWideScreen && styles.scoreboardTextWide]}>
-                                    {key === 'totalEvents' ? 'EVENTS' :
-                                        key === 'totalUsers' ? 'USERS' :
-                                            key === 'pendingApprovals' ? 'PENDING' :
-                                                'REPORTS'}
-                                </Text>
-                                <Text style={[styles.scoreboardValue, isWideScreen && styles.scoreboardValueWide]}>
-                                    {dashboardData[key]}
-                                </Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                <View style={styles.overviewContainer}>
-                    <Text style={[styles.overviewTitle, isWideScreen && styles.overviewTitleWide, { color: '#37474F' }]}>Overview :</Text>
-                    {/* Recent Events Section */}
-                    <View style={[styles.chartPlaceholder, isWideScreen && styles.chartPlaceholderWide]}>
-                        <View style={styles.chartHeader}>
-                            <Text style={[styles.chartHeaderText, isWideScreen && styles.chartHeaderTextWide, { color: '#548C2F' }]}>
-                                Recently Created Events
-                            </Text>
-                            <Text style={[styles.chartHeaderSubText, isWideScreen && styles.chartHeaderSubTextWide, { color: '#7B8788' }]}>
-                                Last 5 Events
-                            </Text>
-                        </View>
-                        <View style={styles.subtleLine} />
-                        {recentEventsData.length > 0 ? (
-                            recentEventsData.map((event, index) => (
-                                <View
-                                    key={event?.event_id ? `event-${event.event_id}` : `event-${index}`}
-                                    style={styles.recentEventItem}
-                                >
-                                    <Text style={styles.recentEventTitle}>
-                                        {event?.event_name ?? 'Unnamed Event'}
-                                    </Text>
-                                    <Text style={styles.recentEventDate}>
-                                        Created: {event?.created_at ? moment(event.created_at).format('MMM DD, hh:mm a') : 'Unknown Date'}
-                                    </Text>
-                                </View>
-                            ))
-                        ) : (
-                            <View style={styles.chartOverlayText}>
-                                <Text style={{ color: '#A7B1A0', textAlign: 'center', fontSize: isWideScreen ? 16 : 14 }}>
-                                    No recent events available.
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-
-                <View style={styles.participantsContainer}>
-                    <Text style={[styles.participantsTitle, isWideScreen && styles.participantsTitleWide, { color: '#37474F' }]}>
-                        Total Number of Participants per Event
+              {/* Header */}
+              <View style={styles.headerContainer}>
+                <Text style={styles.headerTitle}>Dashboard</Text>
+              </View>
+      
+              <View style={styles.scoreboardGrid}>
+                {Object.keys(dashboardData).slice(0, 4).map((key, index) => (
+                  <TouchableOpacity
+                    key={`${key}-${index}`} // fixed key
+                    style={[
+                      styles.scoreboardButton,
+                      styles[`scoreboardButton${index + 1}`],
+                      hoveredIndex === index && styles.scoreboardButtonHovered,
+                    ]}
+                    onPressIn={() => setHoveredIndex(index)}
+                    onPressOut={() => setHoveredIndex(null)}
+                    onPress={() => handleScoreboardClick(index)}
+                    disabled={index !== 0 && index !== 1 && index !== 3} // Enable click for Users, Events, and Reports
+                  >
+                    <LinearGradient
+                      colors={[scoreboardColors[index].primary, scoreboardColors[index].secondary]}
+                      style={styles.scoreboardButtonGradient}
+                    >
+                      {hoveredIndex === index && (
+                        <Animated.View style={[styles.shine, getShineTransform()]} />
+                      )}
+                      <View style={styles.scoreboardIconContainer}>
+                        <FontAwesome5
+                          name={
+                            index === 0 ? "users" : // Users
+                              index === 1 ? "calendar-alt" : // Events
+                                index === 2 ? "hourglass-half" : // Pending
+                                  "file-alt" // Reports
+                          }
+                          size={isWideScreen ? 40 : 24}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <Text style={[styles.scoreboardText, isWideScreen && styles.scoreboardTextWide]}>
+                        {key === 'totalEvents' ? 'EVENTS' :
+                          key === 'totalUsers' ? 'USERS' :
+                            key === 'pendingApprovals' ? 'PENDING' :
+                              'REPORTS'}
+                      </Text>
+                      <Text style={[styles.scoreboardValue, isWideScreen && styles.scoreboardValueWide]}>
+                        {dashboardData[key]}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ))}
+              </View>
+      
+              <View style={styles.overviewContainer}>
+                <Text style={[styles.overviewTitle, isWideScreen && styles.overviewTitleWide, { color: '#37474F' }]}>Overview :</Text>
+                {/* Recent Events Section */}
+                <View style={[styles.chartPlaceholder, isWideScreen && styles.chartPlaceholderWide]}>
+                  <View style={styles.chartHeader}>
+                    <Text style={[styles.chartHeaderText, isWideScreen && styles.chartHeaderTextWide, { color: '#548C2F' }]}>
+                      Recently Created Events
                     </Text>
-                    {/* Chart for participants per event */}
-                    <View style={[styles.chartPlaceholder, isWideScreen && styles.chartPlaceholderWide, { overflow: 'hidden' }]}>
-                        <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
-                            {participantsPerEventData.length > 0 ? (
-                                <BarChart
-                                    data={{
-                                        labels: participantsPerEventData.map(item => item.event_name),
-                                        datasets: [
-                                            {
-                                                data: participantsPerEventData.map(item => item.participant_count),
-                                            },
-                                        ],
-                                    }}
-                                    width={participantsPerEventData.length * 120} // Adjust width as needed
-                                    height={220}
-                                    yAxisLabel={'Count'}
-                                    chartConfig={{
-                                        backgroundColor: '#e26a00',
-                                        backgroundGradientFrom: '#fb8c00',
-                                        backgroundGradientTo: '#ffa726',
-                                        decimalPlaces: 0,
-                                        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                                        labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                                        style: {
-                                            borderRadius: 16,
-                                        },
-                                        propsForDots: {
-                                            r: '6',
-                                            strokeWidth: '2',
-                                            stroke: '#ffa726',
-                                        },
-                                        xAxisLabelRotation: -45,
-                                    }}
-                                    bezier
-                                    style={{
-                                        marginVertical: 8,
-                                        borderRadius: 16,
-                                    }}
-                                />
-                            ) : (
-                                <View style={styles.chartOverlayText}>
-                                    <Text style={{ color: '#A7B1A0', textAlign: 'center', fontSize: isWideScreen ? 16 : 14 }}>
-                                        No participant data available.
-                                    </Text>
-                                </View>
-                            )}
-                        </ScrollView>
+                    <Text style={[styles.chartHeaderSubText, isWideScreen && styles.chartHeaderSubTextWide, { color: '#7B8788' }]}>
+                      Last 5 Events
+                    </Text>
+                  </View>
+                  <View style={styles.subtleLine} />
+                  {recentEventsData.length > 0 ? (
+                    recentEventsData.map((event, index) => (
+                      <View
+                        key={event?.event_id ? `event-${event.event_id}` : `event-${index}`}
+                        style={styles.recentEventItem}
+                      >
+                        <Text style={styles.recentEventTitle}>
+                          {event?.event_name ?? 'Unnamed Event'}
+                        </Text>
+                        <Text style={styles.recentEventDate}>
+                          Created: {event?.created_at ? moment(event.created_at).format('MMM DD, hh:mm a') : 'Unknown Date'}
+                        </Text>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.chartOverlayText}>
+                      <Text style={{ color: '#A7B1A0', textAlign: 'center', fontSize: isWideScreen ? 16 : 14 }}>
+                        No recent events available.
+                      </Text>
                     </View>
+                  )}
                 </View>
-
-                {/* Reports Modal */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={showReports}
-                    onRequestClose={handleCloseReports}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>User Reports</Text>
-
-                            <ScrollView style={styles.reportsList}>
-                                {reportsData.length > 0 ? (
-                                    reportsData.map((report, index) => (
-                                        <TouchableOpacity
-                                            key={report.report_id || index}
-                                            style={styles.reportItem}
-                                            onPress={() => {
-                                                openModal(report); // Select report
-                                                handleCloseReports(); // Close the list modal
-                                            }}
-                                        >
-                                            <Text style={styles.modalText}>Reported by: {report.full_name ?? 'Unknown User'}</Text>
-
-
-
-                                            <Text style={styles.reportDescription}>{report.description}</Text>
-                                            <Text style={styles.reportTimestamp}>{moment(report.timestamp).format('MMM DD, hh:mm a')}</Text>
-                                        </TouchableOpacity>
-                                    ))
-                                ) : (
-                                    <Text style={styles.noReports}>No reports available.</Text>
-                                )}
-                            </ScrollView>
-
-                            <TouchableOpacity style={styles.closeButton} onPress={handleCloseReports}>
-                                <Text style={styles.closeButtonText}>Close</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={modalVisible}
-                    onRequestClose={closeModal}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            {selectedReport && (
-                                <>
-                                    <Text style={styles.modalTitle}>Report Details</Text>
-                                    <Text style={styles.modalText}>Reported by: {selectedReport?.full_name || 'Unknown User'}</Text>
-                                    <Text style={styles.modalText}>Description: {selectedReport?.description || 'No description'}</Text>
-                                    <Text style={[styles.modalText, { fontStyle: 'italic', marginVertical: 8 }]}>
-                                        {address}
-                                    </Text>
-                                    <Text style={styles.modalText}>Reported at: {selectedReport?.timestamp ? moment(selectedReport.timestamp).format('MMMM DD, hh:mm a') : 'Unknown Date'}</Text>
-
-                                    {/* Images */}
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 15 }}>
-                                        {selectedReport.images && selectedReport.images.length > 0 ? (
-                                            selectedReport.images.map((imgFilename, idx) => (
-                                                <Image
-                                                    key={idx}
-                                                    source={{
-                                                        uri: `https://backend-rt98.onrender.com/uploads/${imgFilename}`
-                                                    }}
-                                                    style={styles.reportImage}
-                                                />
-                                            ))
-                                        ) : (
-                                            <Text style={styles.noImageText}>No images uploaded.</Text>
-                                        )}
-                                    </ScrollView>
-
-
-
-
-                                    <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-                                        <Text style={styles.closeButtonText}>Close</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
-
-
-                        </View>
-                    </View>
-                </Modal>
-
-
-
+              </View>
+      
+              <View style={styles.participantsContainer}>
+                <Text style={[styles.participantsTitle, isWideScreen && styles.participantsTitleWide, { color: '#37474F' }]}>
+                  Total Number of Participants per Event
+                </Text>
+                {/* Chart for participants per event */}
+                <View style={[styles.chartPlaceholder, isWideScreen && styles.chartPlaceholderWide, { overflow: 'hidden' }]}>
+                  <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
+                    {participantsPerEventData.length > 0 ? (
+                    <PieChart
+                    data={participantsPerEventData
+                      .filter(item => item.participant_count > 0) // ✅ Exclude events with 0 or null participants
+                      .map((item, index) => ({
+                        name: item.event_name,
+                        population: item.participant_count,
+                        color: `hsl(${(index * 60) % 360}, 70%, 50%)`, // Unique color per slice
+                        legendFontColor: '#333',
+                        legendFontSize: 12,
+                      }))
+                    }
+                    width={width - 40}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: '#FFFFFF',
+                      backgroundGradientFrom: '#FFFFFF',
+                      backgroundGradientTo: '#FFFFFF',
+                      color: (opacity = 1) => `rgba(84, 140, 47, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    }}
+                    accessor="population"
+                    backgroundColor="transparent"
+                    paddingLeft="15"
+                  />
+                  
+                    ) : (
+                      <View style={styles.chartOverlayText}>
+                        <Text style={{ color: '#A7B1A0', textAlign: 'center', fontSize: isWideScreen ? 16 : 14 }}>
+                          No participant data available.
+                        </Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
+      
+              
+      
+              {/* Reports Modal */}
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={showReports}
+                onRequestClose={handleCloseReports}
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>User Reports</Text>
+      
+                    <ScrollView style={styles.reportsList}>
+                      {reportsData.length > 0 ? (
+                        reportsData.map((report, index) => (
+                          <TouchableOpacity
+                            key={report.report_id || index}
+                            style={styles.reportItem}
+                            onPress={() => {
+                              openModal(report); // Select report
+                              handleCloseReports(); // Close the list modal
+                            }}
+                          >
+                            <Text style={styles.modalText}>Reported by: {report.full_name ?? 'Unknown User'}</Text>
+                            <Text style={styles.reportDescription}>{report.description}</Text>
+                            <Text style={styles.modalText}>Street: {report.street || 'Unknown'}</Text>
+                            <Text style={styles.reportTimestamp}>{moment(report.timestamp).format('MMM DD, hh:mm a')}</Text>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <Text style={styles.noReports}>No reports available.</Text>
+                      )}
+                    </ScrollView>
+      
+                    <TouchableOpacity style={styles.closeButton} onPress={handleCloseReports}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={closeModal}
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.modalContent}>
+                    {selectedReport && (
+                      <>
+                        <Text style={styles.modalTitle}>Report Details</Text>
+                        <Text style={styles.modalText}>Reported by: {selectedReport?.full_name || 'Unknown User'}</Text>
+                        <Text style={styles.modalText}>Description: {selectedReport?.description || 'No description'}</Text>
+                        <Text style={styles.modalText}>Street: {selectedReport?.street || 'Unknown Street'}</Text>
+      
+                        <Text style={[styles.modalText, { fontStyle: 'italic', marginVertical: 8 }]}>
+                          {address}
+                        </Text>
+                        <Text style={styles.modalText}>Reported at: {selectedReport?.timestamp ? moment(selectedReport.timestamp).format('MMMM DD, hh:mm a') : 'Unknown Date'}</Text>
+      
+                        {/* Images */}  
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          style={{ marginTop: 15 }}
+                        >
+                          {selectedReport.images?.length > 0 ? (
+                            selectedReport.images.map((imgFilename, idx) => (
+                              <Image
+                                key={idx}
+                                source={{
+                                  uri: `https://backend-rt98.onrender.com/uploads/${imgFilename}`
+                                }}
+                                style={styles.reportImage}
+                                resizeMode="cover"
+                              />
+                            ))
+                          ) : (
+                            <Text style={styles.noImageText}>No images uploaded.</Text>
+                          )}
+                        </ScrollView>
+      
+                        <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+                          <Text style={styles.closeButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </Modal>
             </ScrollView>
+          )}
         </View>
-    );
+      );
+
+    
 };
 
 const styles = StyleSheet.create({
     scrollContainer: {
         flex: 1,
-        backgroundColor: '#f0f4f0', // Light background for the whole screen
+        backgroundColor: '#f0f4f0',
+        paddingBottom: 80,
     },
     container: {
         flexGrow: 1,
@@ -465,7 +540,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     headerTitle: {
-        fontSize: 24,
+        fontSize: 30,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -699,8 +774,40 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#888',
         fontStyle: 'italic'
+    },
+    floatingButtonContainer: {
+        position: 'absolute',
+        bottom: 20, // Adjust this value to move it up/down (higher number = higher up)
+        right: 75,  // Position from right edge
+        zIndex: 5,
+    },
+    mapToggleButton: {
+        backgroundColor: "#28a745",
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
+        minWidth: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    mapToggleButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+    backButtonContainer: {
+        width: '100%',
+        paddingHorizontal: 10,
+        marginTop: 10,
+        marginBottom: 10,
     }
 });
 
 export default AdminHome;
 
+ 

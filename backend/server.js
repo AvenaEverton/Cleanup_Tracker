@@ -1,3 +1,4 @@
+
 // server.js (Node.js with Express)
 const express = require("express");
 const mysql = require("mysql2");
@@ -9,6 +10,7 @@ const socketIo = require("socket.io");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const moment = require("moment");
 
 const app = express();
 const server = http.createServer(app);
@@ -26,9 +28,6 @@ app.use(
   "/uploads",
   express.static(path.join(__dirname, "uploads"))
 );
-
-// Add moment for date formatting
-const moment = require('moment');
 
 // Set up storage for image uploads
 const storage = multer.diskStorage({
@@ -57,6 +56,12 @@ const upload = multer({
       }
     }
   });
+
+cloudinary.config({ 
+    cloud_name: 'dgkzqmtgy', 
+    api_key: '138712578489821', 
+    api_secret: 't60XhGuihc92t01GZtNFpR7dXU0' // Click 'View API Keys' above to copy your API secret
+});
 
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -252,8 +257,8 @@ app.post("/addEvent", upload.single('image'), (req, res) => {
   
       const insertSql = `INSERT INTO events 
         (event_name, description, event_date, event_time, location, 
-         add_details, created_by, image_url) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+         add_details, created_by) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`;
         
       db.query(insertSql, 
         [eventName, description, date, time, location, 
@@ -659,13 +664,43 @@ app.get('/api/events/recent', async (req, res) => {
     }
   });
 
-  // In your server.js, add this test route temporarily:
-app.get('/api/test-endpoint', (req, res) => {
-    res.json({ message: "Backend is working!", status: 200 });
-  });
+  app.get('/api/user/stats/:userId', async (req, res) => {
+    const { userId } = req.params;
+  
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required.' });
+    }
+  
+    try {
+      // Use db.promise().query for database interaction
+      const [reportCountResult] = await db.promise().query(
+        'SELECT COUNT(*) AS reportCount FROM reports WHERE user = ?',
+        [userId]
+      );
+  
+      const [eventCountResult] = await db.promise().query(
+        'SELECT COUNT(*) AS eventCount FROM event_participants WHERE user_id = ?',
+        [userId]
+      );
+  
+      res.json({
+        reportCount: reportCountResult[0].reportCount,
+        eventCount: eventCountResult[0].eventCount
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      res.status(500).json({ error: 'Database error fetching user statistics' });
+    }
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ message: "Backend is working!", timestamp: new Date() });
+});
+
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running on port ${PORT}`);
 });
-
