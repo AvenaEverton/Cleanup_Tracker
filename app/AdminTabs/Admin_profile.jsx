@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../../context/ThemeContext";
@@ -25,6 +25,11 @@ const AdminProfile = () => {
     const [showSaved, setShowSaved] = useState(false);
     const [totalSavedItems, setTotalSavedItems] = useState(0);
     const [selectedSavedSection, setSelectedSavedSection] = useState('events');
+    const [eventModalVisible, setEventModalVisible] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [participants, setParticipants] = useState([]);
+    const [participantsLoading, setParticipantsLoading] = useState(false);
+    const [participantsError, setParticipantsError] = useState(null);
 
     const handleLogout = async () => {
         try {
@@ -348,6 +353,24 @@ const AdminProfile = () => {
         }
     };
 
+    const handleEventPress = async (event) => {
+        setSelectedEvent(event);
+        setEventModalVisible(true);
+        setParticipants([]);
+        setParticipantsError(null);
+        setParticipantsLoading(true);
+        try {
+            const response = await axios.get(
+                `https://backend-rt98.onrender.com/api/events/${event.event_id}/participants`
+            );
+            setParticipants(response.data.participants || []);
+        } catch (error) {
+            setParticipantsError("Failed to fetch participants.");
+        } finally {
+            setParticipantsLoading(false);
+        }
+    };
+
     return (
         <View style={{ flex: 1 }}>
             <ScrollView
@@ -493,7 +516,11 @@ const AdminProfile = () => {
 
                             <ScrollView style={styles.eventsList}>
                                 {events.map((event) => (
-                                    <View key={event.event_id} style={styles.eventListItem}>
+                                    <TouchableOpacity
+                                        key={event.event_id}
+                                        style={styles.eventListItem}
+                                        onPress={() => handleEventPress(event)}
+                                    >
                                         <View style={styles.eventIcon}>
                                             <Ionicons name="calendar-outline" size={20} color="#fff" />
                                         </View>
@@ -537,13 +564,102 @@ const AdminProfile = () => {
                                         >
                                             <Ionicons name="trash-outline" size={24} color="#dc3545" />
                                         </TouchableOpacity>
-                                    </View>
+                                    </TouchableOpacity>
                                 ))}
                             </ScrollView>
                         </>
                     )}
                 </View>
             )}
+
+            {/* Event Modal */}
+            <Modal
+                visible={eventModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setEventModalVisible(false)}
+            >
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <View style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        padding: 24,
+                        width: '85%',
+                        alignItems: 'center'
+                    }}>
+                        {selectedEvent && (
+                            <>
+                                <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 10 }}>
+                                    {selectedEvent.event_name}
+                                </Text>
+                                <Text style={{ fontSize: 16, marginBottom: 5 }}>
+                                    Date: {selectedEvent.event_date ? format(new Date(selectedEvent.event_date), 'PPP') : 'N/A'}
+                                </Text>
+                                <Text style={{ fontSize: 16, marginBottom: 5 }}>
+                                    Time: {selectedEvent.event_time || 'N/A'}
+                                </Text>
+                                <Text style={{ fontSize: 16, marginBottom: 5 }}>
+                                    Location: {selectedEvent.location}
+                                </Text>
+                                {/* Participants Section */}
+                                <Text style={{ fontSize: 18, fontWeight: 'bold', marginTop: 15, marginBottom: 5 }}>
+                                    Participants
+                                </Text>
+                                {participantsLoading ? (
+                                    <Text>Loading participants...</Text>
+                                ) : participantsError ? (
+                                    <Text style={{ color: 'red' }}>{participantsError}</Text>
+                                ) : participants.length === 0 ? (
+                                    <Text>No participants yet.</Text>
+                                ) : (
+                                    <ScrollView style={{ maxHeight: 160, width: '100%' }}>
+                                        {participants.map((p, idx) => (
+                                            <View
+                                                key={idx}
+                                                style={{
+                                                    marginBottom: 10,
+                                                    padding: 12,
+                                                    backgroundColor: idx % 2 === 0 ? '#F7FAFC' : '#E2E8F0',
+                                                    borderRadius: 8,
+                                                    shadowColor: "#000",
+                                                    shadowOffset: { width: 0, height: 1 },
+                                                    shadowOpacity: 0.07,
+                                                    shadowRadius: 2,
+                                                    elevation: 1,
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2B6CB0', marginBottom: 2 }}>
+                                                    {p.fullName}
+                                                </Text>
+                                                <Text style={{ fontSize: 13, color: '#4A5568' }}>
+                                                    {p.joined_at ? format(new Date(p.joined_at), 'PPPpp') : ''}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                )}
+                            </>
+                        )}
+                        <TouchableOpacity
+                            style={{
+                                marginTop: 20,
+                                backgroundColor: '#3182CE',
+                                borderRadius: 8,
+                                paddingVertical: 10,
+                                paddingHorizontal: 30
+                            }}
+                            onPress={() => setEventModalVisible(false)}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Reports List */}
             {showReports && (

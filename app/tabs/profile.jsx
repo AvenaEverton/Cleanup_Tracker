@@ -12,6 +12,7 @@ import {
     Easing,
     ActivityIndicator,
     Alert,
+    Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,7 +20,8 @@ import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../context/ThemeContext";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { SafeAreaView } from 'react-native-safe-area-context';
-const axios = require('axios');
+import axios from 'axios';
+
 
 // Import your avatar border images
 import borderDefault from '../../assets/images/border_default.png';
@@ -30,7 +32,7 @@ import borderCloud from '../../assets/images/border_cloud.png';
 import borderHappy from '../../assets/images/border_happy.png';
 
 const APP_VERSION = "1.0.0";
-const { width, height } = Dimensions.get("window");
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 const avatarBorderOptions = [
     { name: 'Default', source: borderDefault },
@@ -40,6 +42,33 @@ const avatarBorderOptions = [
     { name: 'Cloud', source: borderCloud },
     { name: 'Happy', source: borderHappy },
 ];
+
+const fetchAddress = async (latitude, longitude) => {
+    try {
+        const response = await fetch(
+            `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=e51fa78ef9e946cda57e3ca54876e825`
+        );
+        const data = await response.json();
+
+        if (data && data.features && data.features.length > 0) {
+            const props = data.features[0].properties;
+
+            const street = props.street || "Unknown Street";
+            const barangay = props.suburb || props.quarter || "Unknown Barangay";
+            const city = props.city || props.town || props.village || "Unknown City";
+            const state = props.state || "Unknown Region";
+            const postcode = props.postcode || "0000";
+            const country = props.country || "Unknown Country";
+
+            return `${street}, ${barangay}, ${city}, ${state}, ${postcode}, ${country}`;
+        } else {
+            return "Address not found";
+        }
+    } catch (error) {
+        console.error("Error fetching address:", error);
+        return "Error fetching address";
+    }
+};
 
 const ProfileScreen = () => {
     const router = useRouter();
@@ -57,13 +86,15 @@ const ProfileScreen = () => {
     const switchRotationAnim = useRef(new Animated.Value(0)).current;
     const [reportImages, setReportImages] = useState([]);
     const [loadingImages, setLoadingImages] = useState(false);
-    // In ProfileScreen.js
-const [profileSettings, setProfileSettings] = useState({
-    profilePicture: null,
-    selectedBorderIndex: 0,
-    iconName: 'user-circle',
-    iconSource: null
-});
+    const [modalVisible, setModalVisible] = useState(false);
+    const [loadingReports, setLoadingReports] = useState(false);
+    const [reports, setReports] = useState([]);
+    const [profileSettings, setProfileSettings] = useState({
+        profilePicture: null,
+        selectedBorderIndex: 0,
+        iconName: 'user-circle',
+        iconSource: null
+    });
 
     useEffect(() => {
         Animated.timing(rotationAnim, {
@@ -131,6 +162,42 @@ const [profileSettings, setProfileSettings] = useState({
           console.error("Failed to fetch user stats", error);
         }
     };    
+
+    const fetchReports = async () => {
+        setLoadingReports(true);
+        try {
+            const userDataString = await AsyncStorage.getItem("userData");
+            const userData = JSON.parse(userDataString);
+            const userId = userData?.userId;
+
+            if (!userId) {
+                Alert.alert("Error", "User not authenticated.");
+                setLoadingReports(false);
+                return;
+            }
+
+            const response = await axios.get(`https://backend-rt98.onrender.com/api/user/reports`, {
+                params: { userId },
+            });
+
+            if (response.status === 200) {
+                const reportsWithAddresses = await Promise.all(
+                    response.data.map(async (report) => {
+                        const address = await fetchAddress(report.latitude, report.longitude);
+                        return { ...report, address }; // Add the address to the report
+                    })
+                );
+                setReports(reportsWithAddresses); // Set the reports with addresses
+            } else {
+                Alert.alert("Error", "Failed to fetch reports.");
+            }
+        } catch (error) {
+            console.error("Error fetching reports:", error);
+            Alert.alert("Error", "Failed to fetch reports.");
+        } finally {
+            setLoadingReports(false);
+        }
+    };
 
     const animatedStyle = {
         transform: [
@@ -366,11 +433,79 @@ const [profileSettings, setProfileSettings] = useState({
                     </View>
 
                     {/* Reports History */}
-                    <View style={[styles.reportsHistoryContainer, { marginTop: height * 0.02, marginBottom: height * 0.05, backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : '#f0f0f0' }]}>
+                    <View style={[styles.reportsHistoryContainer, { marginTop: screenHeight * 0.02, marginBottom: screenHeight * 0.05, backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : '#f0f0f0' }]}>
                         <Text style={[styles.reportsHistoryTitle, darkMode ? styles.darkText : styles.lightText]}>
                             Reports History
                         </Text>
+                        <TouchableOpacity 
+                            style={styles.viewReportsButton} 
+                            onPress={() => {
+                                setModalVisible(true);
+                                fetchReports();
+                            }}
+                        >
+                            <Text style={styles.viewReportsButtonText}>View Reports</Text>
+                        </TouchableOpacity>
                     </View>
+
+                    {/* Modal for Viewing Reports */}
+                    <Modal
+                        animationType="slide"
+                        transparent={true}
+                        visible={modalVisible}
+                        onRequestClose={() => setModalVisible(false)} // Close the modal when back button is pressed
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Reports</Text>
+                                {loadingReports ? (
+                                    <ActivityIndicator size="large" color="#4CAF50" />
+                                ) : reports.length > 0 ? (
+                                    <ScrollView style={{ width: "100%" }}>
+                                        {reports.map((report) => (
+                                            <View key={report.report_id} style={styles.reportItem}>
+                                                <Text style={styles.reportText}>
+                                                    <Text style={{ fontWeight: "bold" }}>Description:</Text> {report.description}
+                                                </Text>
+                                                <Text style={styles.reportText}>
+                                                    <Text style={{ fontWeight: "bold" }}>Timestamp:</Text> {new Date(report.timestamp).toLocaleString()}
+                                                </Text>
+                                                <Text style={styles.reportText}>
+                                                    <Text style={{ fontWeight: "bold" }}>Location:</Text> {report.latitude}, {report.longitude}
+                                                </Text>
+                                                <Text style={styles.reportText}>
+                                                    <Text style={{ fontWeight: "bold" }}>Address:</Text> {report.address}
+                                                </Text>
+                                                {report.images.length > 0 ? (
+                                                    <ScrollView horizontal style={styles.imageContainer}>
+                                                        {report.images.map((image, index) => (
+                                                            <Image
+                                                                key={index}
+                                                                source={{ uri: image }}
+                                                                style={styles.reportImage}
+                                                                onError={(e) => console.log('Image failed to load:', image, e.nativeEvent.error)}
+                                                                onLoad={() => console.log('Image loaded successfully:', image)}
+                                                            />
+                                                        ))}
+                                                    </ScrollView>
+                                                ) : (
+                                                    <Text style={styles.noImageText}>No images available</Text>
+                                                )}
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                ) : (
+                                    <Text style={styles.modalText}>No reports found.</Text>
+                                )}
+                                <TouchableOpacity 
+                                    style={styles.closeButton} 
+                                    onPress={() => setModalVisible(false)} // Close the modal
+                                >
+                                    <Text style={styles.closeButtonText}>Close</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
                 </ScrollView>
             </TouchableWithoutFeedback>
             {/* Settings Overlay */}
@@ -560,8 +695,8 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         backgroundColor: "#f0f0f0",
         borderRadius: 15,
-        marginTop: height * 0.02,
-        marginBottom: height * 0.05
+        marginTop: screenHeight * 0.02,
+        marginBottom: screenHeight * 0.05,
     },
     reportsHistoryTitle: {
         fontSize: 24,
@@ -633,8 +768,73 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     reportImage: {
-        width: '100%',
-        height: '100%',
+        width: 100, // Set a valid width
+        height: 100, // Set a valid height
+        marginRight: 10,
+        borderRadius: 8,
+    },
+    viewReportsButton: {
+        backgroundColor: "#4CAF50",
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        alignSelf: "center",
+        marginTop: 10,
+    },
+    viewReportsButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+    },
+    modalContent: {
+        width: screenWidth * 0.9, // 90% of the screen width
+        maxHeight: screenHeight * 0.8, // 80% of the screen height
+        backgroundColor: "#fff",
+        borderRadius: 10,
+        padding: 20,
+        alignItems: "center",
+    },
+    modalTitle: {
+        fontSize: screenWidth * 0.05, // 5% of the screen width
+        fontWeight: "bold",
+        marginBottom: 10,
+        textAlign: "center",
+    },
+    modalText: {
+        fontSize: 16,
+        marginBottom: 20,
+        textAlign: "center",
+    },
+    closeButton: {
+        backgroundColor: "#4CAF50",
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+    },
+    closeButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+    imageContainer: {
+        marginTop: 10,
+    },
+    reportItem: {
+        marginBottom: 20,
+    },
+    reportText: {
+        fontSize: 16,
+        marginBottom: 5,
+    },
+    noImageText: {
+        fontSize: 16,
+        color: "#777",
     },
 });
 

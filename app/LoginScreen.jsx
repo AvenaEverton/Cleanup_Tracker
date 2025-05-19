@@ -83,8 +83,11 @@ const LoginScreen = () => {
                 Alert.alert("Login Failed", response.data.message || "Invalid credentials");
             }
         } catch (error) {
-            console.error("Login error:", error);
-            Alert.alert("Error", "Network error. Please try again.");
+            if (error.response && error.response.status === 403) {
+                alert(error.response.data.error); // Show "Your account is not approved by the admin."
+            } else {
+                alert("An error occurred during login.");
+            }
         }
     };
 

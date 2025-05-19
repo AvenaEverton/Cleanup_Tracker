@@ -32,6 +32,7 @@ const NotificationsScreen = () => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isJoining, setIsJoining] = useState(false);
     const [noNewEvent, setNoNewEvent] = useState(false);
+    const [joinedEvents, setJoinedEvents] = useState([]);
     
     const navigation = useNavigation();
     const route = useRoute();
@@ -259,7 +260,13 @@ const NotificationsScreen = () => {
             Alert.alert("Error", "User ID not found. Please try again.");
             return;
         }
-        
+
+        // Check if the user has already joined the event
+        if (joinedEvents.includes(eventId)) {
+            Alert.alert("Info", "You have already joined this event.");
+            return;
+        }
+
         setIsJoining(true);
         try {
             const response = await fetch(`${API_BASE_URL}/events/${eventId}/join`, {
@@ -273,10 +280,12 @@ const NotificationsScreen = () => {
             }
 
             Alert.alert("Success", "You have successfully joined the event!");
+            setJoinedEvents((prev) => [...prev, eventId]); // Add the event ID to the joined events
             closeModal();
         } catch (error) {
             console.error("Error joining event:", error);
             Alert.alert("Error", error.message || "Failed to join the event. Please try again.");
+            
         } finally {
             setIsJoining(false);
         }
@@ -353,7 +362,7 @@ const NotificationsScreen = () => {
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <Text style={[styles.loadingText, { color: colors.text }]}>Fetching notifications...</Text>
+                        <Text style={[styles.loadingText, { color: colors.text }]}>Loading...</Text>
                     </View>
                 ) : error ? (
                     <View style={styles.errorContainer}>
@@ -396,8 +405,8 @@ const NotificationsScreen = () => {
                                         There are currently no active clean-up events available.
                                     </Text>
                                     <View style={styles.modalButtons}>
-                                        <TouchableOpacity 
-                                            style={[styles.modalButton, styles.closeButton]} 
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, styles.closeButton]}
                                             onPress={closeModal}
                                         >
                                             <Text style={styles.modalButtonText}>Close</Text>
@@ -439,26 +448,27 @@ const NotificationsScreen = () => {
                                             </Text>
                                         )}
                                         <Text style={[styles.modalText, { color: colors.text }]}>
-                                            Received: {selectedNotification?.created_at ? 
-                                                new Date(selectedNotification.created_at).toLocaleString() : 
-                                                "Unknown date"}
+                                            Received: {selectedNotification?.created_at
+                                                ? new Date(selectedNotification.created_at).toLocaleString()
+                                                : "Unknown date"}
                                         </Text>
                                     </ScrollView>
                                     <View style={styles.modalButtons}>
-                                        {selectedNotification?.event_id && 
+                                        {selectedNotification?.event_id &&
+                                            !joinedEvents.includes(selectedNotification.event_id) &&
                                             differenceInHours(new Date(), new Date(selectedNotification.created_at)) < EVENT_ENDED_THRESHOLD_HOURS && (
-                                            <TouchableOpacity
-                                                style={[styles.modalButton, styles.joinButton]}
-                                                onPress={() => handleJoinEvent(selectedNotification.event_id)}
-                                                disabled={isJoining}
-                                            >
-                                                <Text style={styles.modalButtonText}>
-                                                    {isJoining ? "Joining..." : "Join Event"}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                        <TouchableOpacity 
-                                            style={[styles.modalButton, styles.closeButton]} 
+                                                <TouchableOpacity
+                                                    style={[styles.modalButton, styles.joinButton]}
+                                                    onPress={() => handleJoinEvent(selectedNotification.event_id)}
+                                                    disabled={isJoining}
+                                                >
+                                                    <Text style={styles.modalButtonText}>
+                                                        {isJoining ? "Joining..." : "Join Event"}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, styles.closeButton]}
                                             onPress={closeModal}
                                         >
                                             <Text style={styles.modalButtonText}>Close</Text>
